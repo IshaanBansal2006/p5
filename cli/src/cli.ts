@@ -2,9 +2,26 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { cmdDevpostGen } from './commands/devpostGen.js';
 import { cmdReadmeSync } from './commands/readmeSync.js';
+import { cmdInit } from './commands/init.js';
 
 export async function runCLI(): Promise<void> {
   await yargs(hideBin(process.argv))
+    .command(
+      'init',
+      'Initialize P5 project with full setup',
+      (yargs) => {
+        return yargs
+          .option('server', {
+            alias: 's',
+            describe: 'Server URL for P5 APIs',
+            type: 'string',
+            default: 'http://localhost:3000'
+          });
+      },
+      async (args) => {
+        await cmdInit(args);
+      }
+    )
     .command(
       'devpost gen [owner] [repo]',
       'Generate Devpost draft',
