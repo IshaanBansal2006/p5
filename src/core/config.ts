@@ -27,14 +27,40 @@ export function loadConfig(projectRoot: string): P5Config | null {
       // For TypeScript config files, we'll use a simple eval approach
       // In production, you might want to use a proper TypeScript compiler
       const content = readFileSync(configFile, 'utf-8');
-      const configMatch = content.match(/export\s+default\s+({[\s\S]*?})\s*;?\s*$/m);
-      if (configMatch) {
+      // Match export default { ... } with optional satisfies clause
+      // Find the start of the object and then find the matching closing brace
+      const startMatch = content.match(/export\s+default\s+(\{)/);
+      if (startMatch) {
+        const startPos = startMatch.index! + startMatch[0].length - 1; // Position of the opening brace
+        let braceCount = 0;
+        let endPos = startPos;
+        
+        for (let i = startPos; i < content.length; i++) {
+          if (content[i] === '{') braceCount++;
+          else if (content[i] === '}') {
+            braceCount--;
+            if (braceCount === 0) {
+              endPos = i;
+              break;
+            }
+          }
+        }
+        
+        const configStr = content.substring(startPos, endPos + 1);
+        
         // Simple JSON-like parsing - this is a simplified approach
-        const configStr = configMatch[1]
-          .replace(/(\w+):/g, '"$1":')
-          .replace(/'/g, '"')
-          .replace(/,(\s*[}\]])/g, '$1');
-        return JSON.parse(configStr);
+        // First, handle unquoted keys (but not inside strings)
+        let parsedConfigStr = configStr;
+        
+        // Replace unquoted keys with quoted keys, but avoid keys that are already quoted
+        parsedConfigStr = parsedConfigStr.replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g, '$1"$2":');
+        
+        // Replace single quotes with double quotes
+        parsedConfigStr = parsedConfigStr.replace(/'/g, '"');
+        
+        // Remove trailing commas before closing brackets/braces
+        parsedConfigStr = parsedConfigStr.replace(/,(\s*[}\]])/g, '$1');
+        return JSON.parse(parsedConfigStr);
       }
     } else {
       const content = readFileSync(configFile, 'utf-8');

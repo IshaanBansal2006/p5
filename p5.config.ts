@@ -1,5 +1,3 @@
-import { P5Config } from './src/types/config.js';
-
 export default {
   "project": {
     "name": "Test Project",

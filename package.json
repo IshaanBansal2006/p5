@@ -38,7 +38,10 @@
     "@types/node": "^22.5.0",
     "@types/yargs": "^17.0.32",
     "@types/prompts": "^2.4.9",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
     "esbuild": "^0.23.0",
+    "eslint": "^9.0.0",
     "typescript": "^5.4.5"
   },
   "engines": {

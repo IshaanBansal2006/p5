@@ -154,7 +154,7 @@ async function detectTechnologies(projectRoot: string): Promise<string> {
       if (deps['aws-sdk']) technologies.push('AWS');
       if (deps.vercel) technologies.push('Vercel');
       if (deps.netlify) technologies.push('Netlify');
-    } catch (error) {
+    } catch (_error) {
       // Ignore JSON parse errors
     }
   }
@@ -203,7 +203,7 @@ async function generateBuiltWithList(projectRoot: string): Promise<string> {
           builtWith.push(`- ${dep}@${deps[dep]}`);
         }
       }
-    } catch (error) {
+    } catch (_error) {
       // Ignore JSON parse errors
     }
   }

@@ -3,12 +3,11 @@ import { join } from 'path';
 import prompts from 'prompts';
 import chalk from 'chalk';
 import ora from 'ora';
-import { P5Config, getDefaultConfig, saveConfig } from '../core/config.js';
+import { getDefaultConfig, saveConfig } from '../core/config.js';
 import { isGitRepository, initGitRepository } from '../core/git.js';
 import { createGitHubWorkflow, createHuskyHooks, ensureHuskyInstalled, installHusky } from '../core/ci.js';
 import { createPlaywrightConfig, createSmokeTest } from '../core/playwright.js';
 import { syncReadme } from '../core/readme.js';
-import { runCommand } from '../core/shell.js';
 
 export async function cmdInit(): Promise<void> {
   const spinner = ora('Initializing P5 project...').start();
@@ -24,7 +23,7 @@ export async function cmdInit(): Promise<void> {
     
     // Load or create config
     spinner.text = 'Setting up configuration...';
-    let config = getDefaultConfig();
+    const config = getDefaultConfig();
     
     // Prompt for project details
     const responses = await prompts([
@@ -136,7 +135,7 @@ async function addNpmScripts(projectRoot: string): Promise<void> {
       writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
       console.log(chalk.green('✅ Added P5 scripts to package.json'));
     }
-  } catch (error) {
+  } catch (_error) {
     console.log(chalk.yellow('⚠️  Could not update package.json scripts'));
   }
 }

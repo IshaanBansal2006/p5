@@ -1,5 +1,5 @@
 import { runCommand } from './shell.js';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import chalk from 'chalk';
 

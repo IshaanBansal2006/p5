@@ -2,7 +2,6 @@
 
 // Test script for P5 CLI
 const { spawn } = require('child_process');
-const path = require('path');
 
 async function runTest() {
   console.log('🧪 Testing P5 CLI...\n');

@@ -99,7 +99,7 @@ export async function ensureHuskyInstalled(projectRoot: string): Promise<boolean
   }
 }
 
-export async function installHusky(projectRoot: string): Promise<boolean> {
+export async function installHusky(_projectRoot: string): Promise<boolean> {
   const { runCommand } = await import('./shell.js');
   
   console.log(chalk.blue('📦 Installing husky...'));

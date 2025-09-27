@@ -189,7 +189,7 @@ async function detectBuildCommand(): Promise<[string, string[]] | null> {
         return ['npx', ['svelte-kit', 'build']];
       }
       
-    } catch (error) {
+    } catch (_error) {
       // Ignore JSON parse errors
     }
   }
