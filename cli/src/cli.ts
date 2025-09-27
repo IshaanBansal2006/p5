@@ -1,29 +1,34 @@
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { cmdInit } from './commands/init.js';
-import { cmdTest } from './commands/test.js';
-import { cmdReadmeSync } from './commands/readmeSync.js';
 import { cmdDevpostGen } from './commands/devpostGen.js';
-import { cmdPwRecord } from './commands/pwRecord.js';
-import { cmdConfigSet } from './commands/configSet.js';
 
-export async function runCLI() {
+export async function runCLI(): Promise<void> {
   await yargs(hideBin(process.argv))
-    .scriptName('p5')
-    .usage('$0 <command> [options]')
-    .command('init', 'Scaffold config, hooks, CI, templates', {}, cmdInit)
-    .command('test', 'Run local build + quick smoke', (yargs) => {
-      return yargs.option('stage', {
-        type: 'string',
-        choices: ['pre-commit', 'pre-push', 'ci'],
-        description: 'Test stage'
-      });
-    }, (argv) => cmdTest(argv.stage))
-    .command('readme sync', 'Update README marked sections', {}, cmdReadmeSync)
-    .command('devpost gen', 'Generate Devpost draft', {}, cmdDevpostGen)
-    .command('pw:record', 'Open Playwright recorder and save a spec', {}, cmdPwRecord)
-    .command('config set <key> <value>', 'Set config values', {}, (argv) => cmdConfigSet(argv.key as string, argv.value as string))
-    .version('0.1.0')
+    .command(
+      'devpost gen [owner] [repo]',
+      'Generate Devpost draft',
+      (yargs) => {
+        return yargs
+          .positional('owner', {
+            describe: 'GitHub repository owner',
+            type: 'string'
+          })
+          .positional('repo', {
+            describe: 'GitHub repository name',
+            type: 'string'
+          })
+          .option('server', {
+            alias: 's',
+            describe: 'Server URL for devpost API',
+            type: 'string',
+            default: 'http://localhost:3000'
+          });
+      },
+      async (args) => {
+        await cmdDevpostGen(args);
+      }
+    )
+    .demandCommand(1, 'You need at least one command before moving on')
     .help()
-    .parseAsync();
+    .argv;
 }
