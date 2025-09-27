@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from 'redis';
+import { Octokit } from '@octokit/rest';
 
 // Redis client configuration
 const redis = createClient({
@@ -14,6 +15,11 @@ const redis = createClient({
 // Connect to Redis
 redis.on('error', (err) => console.log('Redis Client Error', err));
 await redis.connect();
+
+// GitHub API client for validation
+const octokit = new Octokit({
+  auth: process.env.GITHUB_TOKEN,
+});
 
 interface RegisterRequest {
   owner: string;
@@ -44,6 +50,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         { error: 'Invalid parameter format' },
         { status: 400 }
+      );
+    }
+
+    // Validate that the repository exists on GitHub
+    try {
+      await octokit.rest.repos.get({ owner, repo });
+    } catch (error) {
+      return NextResponse.json(
+        { error: `Repository ${owner}/${repo} not found on GitHub` },
+        { status: 404 }
       );
     }
 

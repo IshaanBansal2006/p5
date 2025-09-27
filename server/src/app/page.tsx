@@ -15,14 +15,33 @@ export default function Home() {
         <div className="text-center sm:text-left">
           <h1 className="text-2xl font-bold mb-4">Repository Data Viewer</h1>
           <p className="text-gray-600 mb-4">
-            View repository data stored in Redis by visiting:
+            Register and view repository data with GitHub statistics
           </p>
-          <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-2 py-1 rounded block mb-4">
-            localhost:3000/[owner]/[repo]
-          </code>
-          <p className="text-sm text-gray-500">
-            Example: <a href="/facebook/react" className="text-blue-600 hover:underline">localhost:3000/facebook/react</a>
-          </p>
+          
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-semibold mb-2">Register a Repository</h3>
+              <p className="text-sm text-gray-600 mb-2">
+                Add any public GitHub repository to our system
+              </p>
+              <a 
+                href="/register" 
+                className="inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
+              >
+                Register Repository
+              </a>
+            </div>
+            
+            <div>
+              <h3 className="font-semibold mb-2">View Repository Data</h3>
+              <p className="text-sm text-gray-600 mb-2">
+                Visit: <code className="bg-gray-200 px-1 rounded">localhost:3000/[owner]/[repo]</code>
+              </p>
+              <p className="text-sm text-gray-500">
+                Example: <a href="/facebook/react" className="text-blue-600 hover:underline">localhost:3000/facebook/react</a>
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="flex gap-4 items-center flex-col sm:flex-row">
