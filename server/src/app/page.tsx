@@ -12,18 +12,18 @@ export default function Home() {
           height={38}
           priority
         />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+        <div className="text-center sm:text-left">
+          <h1 className="text-2xl font-bold mb-4">Repository Data Viewer</h1>
+          <p className="text-gray-600 mb-4">
+            View repository data stored in Redis by visiting:
+          </p>
+          <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-2 py-1 rounded block mb-4">
+            localhost:3000/[owner]/[repo]
+          </code>
+          <p className="text-sm text-gray-500">
+            Example: <a href="/facebook/react" className="text-blue-600 hover:underline">localhost:3000/facebook/react</a>
+          </p>
+        </div>
 
         <div className="flex gap-4 items-center flex-col sm:flex-row">
           <a
