@@ -6,7 +6,7 @@ import p5 from 'p5';
 
 // --- P5.js Sketch Logic ---
 const sketch = (p: p5) => {
-    let particles: Particle[] = [];
+    const particles: Particle[] = [];
     const NUM_PARTICLES = 300;
     const MAX_DISTANCE = 110;
     const MOVE_SPEED = 1.0;
