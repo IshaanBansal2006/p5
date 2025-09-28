@@ -12,19 +12,16 @@ const Documentation = () => {
       <header className="border-b border-border/40 backdrop-blur-sm bg-background/80 sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Image src="/p5-logo.png" alt="Player5" width={56} height={56} className="w-14 h-14" />
-            </div>
+            <Link href="/">
+              <div className="flex items-center gap-3">
+                <Image src="/p5-logo.png" alt="Player5" width={56} height={56} className="w-14 h-14" />
+              </div>
+            </Link>
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="sm">
                 <Github className="w-4 h-4" />
                 GitHub
               </Button>
-              <Link href="/">
-                <Button variant="outline" size="sm">
-                  Home
-                </Button>
-              </Link>
             </div>
           </div>
         </div>
