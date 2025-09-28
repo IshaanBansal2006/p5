@@ -8,6 +8,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import RepoLayout from "@/components/RepoLayout";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface StatsData {
   branches: { current: number; percentChange: number };
@@ -317,63 +318,52 @@ const RepoStats = () => {
                 Total Lines of Code Over Commits
               </h3>
               <div className="h-64 bg-background/10 rounded-lg p-4">
-                <div className="h-full relative">
-                  <svg className="w-full h-full" viewBox="0 0 400 200">
-                    {/* Grid lines */}
-                    <defs>
-                      <pattern id="grid" width="40" height="20" patternUnits="userSpaceOnUse">
-                        <path d="M 40 0 L 0 0 0 20" fill="none" stroke="currentColor" strokeWidth="0.5" opacity="0.1"/>
-                      </pattern>
-                    </defs>
-                    <rect width="100%" height="100%" fill="url(#grid)" />
-                    
-                    {/* Line graph */}
-                    <polyline
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="text-primary"
-                      points={timeSeriesData.map((data, index) => {
-                        const x = (index / (timeSeriesData.length - 1)) * 380 + 10;
-                        const y = 190 - ((data.loc / Math.max(...timeSeriesData.map(d => d.loc), 1)) * 170);
-                        return `${x},${y}`;
-                      }).join(' ')}
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={timeSeriesData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground))" opacity={0.3} />
+                    <XAxis 
+                      dataKey="commits" 
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={12}
+                      tickFormatter={(value) => `#${value}`}
                     />
-                    
-                    {/* Data points with hover tooltips */}
-                    {timeSeriesData.map((data, index) => {
-                      const x = (index / (timeSeriesData.length - 1)) * 380 + 10;
-                      const y = 190 - ((data.loc / Math.max(...timeSeriesData.map(d => d.loc), 1)) * 170);
-                      return (
-                        <g key={index}>
-                          <circle
-                            cx={x}
-                            cy={y}
-                            r="3"
-                            fill="currentColor"
-                            className="text-primary cursor-pointer hover:r-4 transition-all"
-                          />
-                          <circle
-                            cx={x}
-                            cy={y}
-                            r="8"
-                            fill="transparent"
-                            className="cursor-pointer"
-                          >
-                            <title>
-                              Commit #{data.commits}
-                              {`\n`}Lines of Code: {data.loc.toLocaleString()}
-                              {`\n`}Date: {new Date(data.date).toLocaleDateString()}
-                              {`\n`}Contributor: {data.contributor}
-                            </title>
-                          </circle>
-                        </g>
-                      );
-                    })}
-                  </svg>
-                </div>
+                    <YAxis 
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={12}
+                      tickFormatter={(value) => value.toLocaleString()}
+                    />
+                    <Tooltip
+                      content={({ active, payload, label }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
+                              <p className="font-medium">Commit #{data.commits}</p>
+                              <p className="text-sm text-muted-foreground">
+                                Lines of Code: {data.loc.toLocaleString()}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                Date: {new Date(data.date).toLocaleDateString()}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                Contributor: {data.contributor}
+                              </p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="loc" 
+                      stroke="hsl(var(--primary))" 
+                      strokeWidth={2}
+                      dot={{ fill: "hsl(var(--primary))", strokeWidth: 2, r: 4 }}
+                      activeDot={{ r: 6, stroke: "hsl(var(--primary))", strokeWidth: 2 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
               <div className="flex justify-center gap-6 mt-4 text-sm">
                 <div className="flex items-center gap-2">
