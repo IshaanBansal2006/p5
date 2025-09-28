@@ -20,6 +20,7 @@ interface CommitData {
   additions: number;
   deletions: number;
   changes: number;
+  avatar_url?: string;
 }
 
 interface TimeSeriesData {
@@ -140,7 +141,6 @@ export async function GET(request: NextRequest) {
 
 
     // Get detailed commit stats
-    const commitsToAnalyze = 20; // Configurable number of commits to analyze
     const detailedCommits: CommitData[] = [];
     for (const commit of commits.data.slice(0, 50)) {
       try {
@@ -152,12 +152,14 @@ export async function GET(request: NextRequest) {
 
         const stats = commitDetail.data.stats;
         let author = commit.commit.author?.name || commit.author?.login || 'Unknown';
+        let avatarUrl = commit.author?.avatar_url;
         
         // Filter out system users and normalize names
         if (author === 'root' || author === 'noreply@github.com' || author === 'GitHub' || 
             author.toLowerCase().includes('bot') || author.toLowerCase().includes('action') ||
             author === 'Unknown' || !author.trim()) {
           author = 'System';
+          avatarUrl = undefined;
         } else {
           // Normalize author names to handle variations
           author = author.trim();
@@ -174,7 +176,8 @@ export async function GET(request: NextRequest) {
           message: commit.commit.message,
           additions: stats?.additions || 0,
           deletions: stats?.deletions || 0,
-          changes: stats?.total || 0
+          changes: stats?.total || 0,
+          avatar_url: avatarUrl
         });
       } catch (error) {
         console.warn(`Failed to get details for commit ${commit.sha}:`, error);
@@ -215,12 +218,17 @@ export async function GET(request: NextRequest) {
         deletions: 0,
         branches: 0,
         merges: 0,
-        avatar_url: undefined
+        avatar_url: commit.avatar_url
       };
 
       existing.commits += 1;
       existing.additions += commit.additions;
       existing.deletions += commit.deletions;
+      
+      // Update avatar_url if we have one and don't already have one
+      if (commit.avatar_url && !existing.avatar_url) {
+        existing.avatar_url = commit.avatar_url;
+      }
       
       if (commit.message.toLowerCase().includes('merge')) {
         existing.merges += 1;
@@ -305,6 +313,19 @@ export async function GET(request: NextRequest) {
 
     const contributorStats = Array.from(contributorMap.values())
       .filter(contributor => contributor.name !== 'System' && contributor.commits > 0);
+
+    // Fill in missing avatar URLs from GitHub contributors API
+    for (const contributor of contributorStats) {
+      if (!contributor.avatar_url) {
+        const githubContributor = contributors.data.find(c => 
+          c.login && (c.login === contributor.name || 
+          c.login.toLowerCase() === contributor.name.toLowerCase())
+        );
+        if (githubContributor) {
+          contributor.avatar_url = githubContributor.avatar_url;
+        }
+      }
+    }
 
     // Calculate awards
     const awards: Awards = {

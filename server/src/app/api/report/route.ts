@@ -63,7 +63,13 @@ interface ProcessedError {
 // Redis data structure for repository bugs - Updated to match document structure
 interface RepositoryData {
   bugs: ProcessedError[];
-  tasks: any[]; // Add tasks array to match your document structure
+  tasks: Array<{
+    id: string;
+    name: string;
+    description?: string;
+    status?: string;
+    [key: string]: unknown;
+  }>; // Add tasks array to match your document structure
 }
 
 // Initialize Redis client with environment variables
@@ -147,13 +153,20 @@ RESPONSE FORMAT (JSON only, no markdown):
       // Clean the response text (remove markdown formatting if present)
       const cleanText = text.replace(/```json\s*|\s*```/g, '').trim();
       geminiResult = JSON.parse(cleanText);
-    } catch (parseError) {
+    } catch {
       console.error('Failed to parse Gemini response:', text);
       throw new Error('Invalid JSON response from Gemini');
     }
 
     // Convert Gemini's processed errors to our format
-    const processedErrors: ProcessedError[] = geminiResult.uniqueErrors.map((error: any, index: number) => {
+    const processedErrors: ProcessedError[] = geminiResult.uniqueErrors.map((error: {
+      taskName: string;
+      errorType: string;
+      severity: string;
+      message: string;
+      priority: string;
+      [key: string]: unknown;
+    }, index: number) => {
       const now = new Date().toISOString();
       return {
         id: `${Date.now()}-${index}`,
@@ -218,39 +231,10 @@ RESPONSE FORMAT (JSON only, no markdown):
       return acc;
     }, []);
 
-    return uniqueErrors.length > 0 ? uniqueErrors : fallbackProcessedErrors;
+    return uniqueErrors.length > 0 ? uniqueErrors : [];
   }
 }
 
-// Helper function to log error details in a readable format
-function logErrorSummary(errors: ProcessedError[], title: string) {
-  console.log(`\n=== ${title} ===`);
-  if (errors.length === 0) {
-    console.log('No errors to display.');
-    return;
-  }
-  
-  // Group by severity for better readability
-  const grouped = errors.reduce((acc, error) => {
-    if (!acc[error.severity]) acc[error.severity] = [];
-    acc[error.severity].push(error);
-    return acc;
-  }, {} as Record<string, ProcessedError[]>);
-  
-  Object.entries(grouped).forEach(([severity, errs]) => {
-    console.log(`\n${severity.toUpperCase()} Priority (${errs.length}):`);
-    errs.forEach((error, index) => {
-      console.log(`  ${index + 1}. ${error.taskName}: ${error.message.substring(0, 80)}${error.message.length > 80 ? '...' : ''}`);
-      if (error.location?.file) {
-        console.log(`     📁 ${error.location.file}:${error.location.line || '?'}`);
-      }
-      if (error.suggestedFix) {
-        console.log(`     🔧 ${error.suggestedFix.substring(0, 60)}${error.suggestedFix.length > 60 ? '...' : ''}`);
-      }
-    });
-  });
-  console.log('');
-}
 
 // Helper function to map original severity to priority scale
 function mapSeverityToPriority(
@@ -259,7 +243,7 @@ function mapSeverityToPriority(
   errorType: string
 ): 'low' | 'medium' | 'high' {
   // High priority conditions
-  if (originalSeverity === 'error') {
+  if (originalSeverity == 'error') {
     if (taskName === 'build' || taskName === 'typecheck') {
       return 'high'; // Build failures and type errors are critical
     }
