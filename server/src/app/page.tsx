@@ -63,10 +63,12 @@ const Home = () => {
                 <Image src='/p5-logo.png' alt="player5" width={60} height={60} className="w-16 h-16" />
               </div>
               <div className="flex items-center gap-4">
-                <Button variant="ghost" size="sm">
-                  <Github className="w-4 h-4" />
-                  GitHub
-                </Button>
+                <Link href="https://github.com/IshaanBansal2006/p5" target="_blank" rel="noopener noreferrer">
+                  <Button variant="ghost" size="sm">
+                    <Github className="w-4 h-4" />
+                    GitHub
+                  </Button>
+                </Link>
                 <Link href="/documentation">
                   <Button variant="outline" size="sm">
                     Documentation

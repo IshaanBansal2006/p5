@@ -18,10 +18,12 @@ const Documentation = () => {
               </div>
             </Link>
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm">
-                <Github className="w-4 h-4" />
-                GitHub
-              </Button>
+              <Link href="https://github.com/IshaanBansal2006/p5" target="_blank" rel="noopener noreferrer">
+                <Button variant="ghost" size="sm">
+                  <Github className="w-4 h-4" />
+                  GitHub
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
