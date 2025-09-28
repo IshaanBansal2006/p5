@@ -4,74 +4,84 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bug, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Clock, Zap, Filter, TriangleAlert as AlertTriangle } from "lucide-react";
-import { useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Bug, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Clock, Zap, Filter, TriangleAlert as AlertTriangle, Plus, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useParams } from "next/navigation";
 import RepoLayout from "@/components/RepoLayout";
 
+// Bug interface definition
+interface Bug {
+  id: string;
+  title: string;
+  description: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  status: 'open' | 'in-progress' | 'resolved' | 'closed';
+  assignee: string;
+  reporter: string;
+  createdAt: string;
+  updatedAt: string;
+  labels: string[];
+  checked: boolean;
+}
+
 const RepoBugs = () => {
+  const params = useParams();
+  const { owner, repo } = params;
   const [showFilter, setShowFilter] = useState(false);
+  const [showNewBug, setShowNewBug] = useState(false);
   const [filterPriority, setFilterPriority] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterAssignee, setFilterAssignee] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
+  const [bugs, setBugs] = useState<Bug[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const [bugs, setBugs] = useState([
-    {
-      id: "#127",
-      title: "Authentication timeout on mobile devices",
-      severity: "critical",
-      status: "open",
-      assignee: "alex_dev",
-      reportedBy: "user_sarah",
-      created: "2 hours ago",
-      labels: ["auth", "mobile", "timeout"],
-      checked: false
-    },
-    {
-      id: "#125",
-      title: "Memory leak in dashboard component",
-      severity: "high",
-      status: "in-progress",
-      assignee: "sarah_codes",
-      reportedBy: "qa_team",
-      created: "1 day ago",
-      labels: ["performance", "memory", "dashboard"],
-      checked: false
-    },
-    {
-      id: "#123",
-      title: "API rate limiting not working correctly",
-      severity: "medium",
-      status: "open",
-      assignee: "mike_builds",
-      reportedBy: "dev_mike",
-      created: "2 days ago",
-      labels: ["api", "rate-limit", "backend"],
-      checked: false
-    },
-    {
-      id: "#120",
-      title: "Dark mode toggle button placement",
-      severity: "low",
-      status: "resolved",
-      assignee: "jenny_test",
-      reportedBy: "user_jen",
-      created: "3 days ago",
-      labels: ["ui", "dark-mode", "accessibility"],
-      checked: false
-    },
-    {
-      id: "#118",
-      title: "Form validation errors not displaying",
-      severity: "high",
-      status: "in-progress",
-      assignee: "tom_ui",
-      reportedBy: "tester_tom",
-      created: "4 days ago",
-      labels: ["forms", "validation", "frontend"],
-      checked: false
+  const [newBugData, setNewBugData] = useState({
+    title: "",
+    description: "",
+    severity: "medium",
+    assignee: "",
+    reporter: "",
+    labels: ""
+  });
+
+  // Fetch bugs from Redis
+  useEffect(() => {
+    const fetchBugs = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        console.log(`Fetching bugs for ${owner}/${repo}`);
+        const response = await fetch(`/api/addBug?owner=${owner}&repo=${repo}`);
+        
+        console.log('Response status:', response.status);
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('API Error:', errorData);
+          throw new Error(`Failed to fetch bugs: ${response.status} ${errorData.error || response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('Bugs data received:', data);
+        setBugs(data.bugs || []);
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+        setError(errorMessage);
+        console.error('Error fetching bugs:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (owner && repo) {
+      fetchBugs();
     }
-  ]);
+  }, [owner, repo]);
 
   const bugStats = [
     { icon: Bug, label: "Total Issues", value: bugs.length.toString(), color: "text-red-500" },
@@ -111,11 +121,63 @@ const RepoBugs = () => {
     }
   };
 
+  const handleNewBug = async () => {
+    if (!newBugData.title.trim()) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/addBug', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          owner,
+          repo,
+          bugs: [{
+            title: newBugData.title,
+            description: newBugData.description,
+            severity: newBugData.severity,
+            status: "open",
+            assignee: newBugData.assignee || "unassigned",
+            reporter: newBugData.reporter || "current_user",
+            labels: newBugData.labels ? newBugData.labels.split(',').map(l => l.trim()) : []
+          }]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create bug');
+      }
+
+      // Refresh bugs from server
+      const refreshResponse = await fetch(`/api/addBug?owner=${owner}&repo=${repo}`);
+      if (refreshResponse.ok) {
+        const refreshData = await refreshResponse.json();
+        setBugs(refreshData.bugs || []);
+      }
+
+      setNewBugData({
+        title: "",
+        description: "",
+        severity: "medium",
+        assignee: "",
+        reporter: "",
+        labels: ""
+      });
+      setShowNewBug(false);
+    } catch (error) {
+      console.error('Error creating bug:', error);
+      setError('Failed to create bug');
+    }
+  };
+
   const handleBugCheck = (bugId: string) => {
     setBugs(prevBugs => 
       prevBugs.map(bug => {
         if (bug.id === bugId) {
-          let newStatus: string;
+          let newStatus: 'open' | 'in-progress' | 'resolved' | 'closed';
           
           switch (bug.status) {
             case "open":
@@ -131,7 +193,7 @@ const RepoBugs = () => {
               newStatus = "open";
           }
           
-          return { ...bug, status: newStatus };
+          return { ...bug, status: newStatus, updatedAt: new Date().toISOString() };
         }
         return bug;
       })
@@ -144,8 +206,8 @@ const RepoBugs = () => {
     if (filterAssignee !== "all" && bug.assignee !== filterAssignee) return false;
     return true;
   }).sort((a, b) => {
-    if (sortBy === "newest") return new Date(b.created).getTime() - new Date(a.created).getTime();
-    if (sortBy === "oldest") return new Date(a.created).getTime() - new Date(b.created).getTime();
+    if (sortBy === "newest") return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    if (sortBy === "oldest") return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     if (sortBy === "priority") {
       const priorityOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
       return (priorityOrder[b.severity] || 0) - (priorityOrder[a.severity] || 0);
@@ -154,6 +216,33 @@ const RepoBugs = () => {
   });
 
   const assignees = [...new Set(bugs.map(bug => bug.assignee))];
+
+  if (loading) {
+    return (
+      <RepoLayout>
+        <div className="flex items-center justify-center py-20">
+          <div className="flex items-center gap-3">
+            <Loader2 className="w-6 h-6 animate-spin" />
+            <span>Loading bugs...</span>
+          </div>
+        </div>
+      </RepoLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <RepoLayout>
+        <div className="text-center py-20">
+          <h2 className="text-2xl font-bold mb-2">Error Loading Bugs</h2>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>
+            Try Again
+          </Button>
+        </div>
+      </RepoLayout>
+    );
+  }
 
   return (
     <RepoLayout>
@@ -272,6 +361,92 @@ const RepoBugs = () => {
                     </div>
                   </DialogContent>
                 </Dialog>
+
+                <Dialog open={showNewBug} onOpenChange={setShowNewBug}>
+                  <DialogTrigger asChild>
+                    <Button variant="default" size="sm">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Bug
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Report New Bug</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="title">Bug Title *</Label>
+                        <Input
+                          id="title"
+                          value={newBugData.title}
+                          onChange={(e) => setNewBugData(prev => ({ ...prev, title: e.target.value }))}
+                          placeholder="Enter bug title"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="description">Description</Label>
+                        <Textarea
+                          id="description"
+                          value={newBugData.description}
+                          onChange={(e) => setNewBugData(prev => ({ ...prev, description: e.target.value }))}
+                          placeholder="Describe the bug in detail"
+                          rows={3}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="severity">Severity</Label>
+                          <Select value={newBugData.severity} onValueChange={(value) => setNewBugData(prev => ({ ...prev, severity: value }))}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="critical">Critical</SelectItem>
+                              <SelectItem value="high">High</SelectItem>
+                              <SelectItem value="medium">Medium</SelectItem>
+                              <SelectItem value="low">Low</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="assignee">Assignee</Label>
+                          <Input
+                            id="assignee"
+                            value={newBugData.assignee}
+                            onChange={(e) => setNewBugData(prev => ({ ...prev, assignee: e.target.value }))}
+                            placeholder="Enter assignee"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="reporter">Reporter</Label>
+                        <Input
+                          id="reporter"
+                          value={newBugData.reporter}
+                          onChange={(e) => setNewBugData(prev => ({ ...prev, reporter: e.target.value }))}
+                          placeholder="Enter reporter name"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="labels">Labels (comma-separated)</Label>
+                        <Input
+                          id="labels"
+                          value={newBugData.labels}
+                          onChange={(e) => setNewBugData(prev => ({ ...prev, labels: e.target.value }))}
+                          placeholder="e.g., frontend, api, critical"
+                        />
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <Button variant="outline" onClick={() => setShowNewBug(false)}>
+                          Cancel
+                        </Button>
+                        <Button onClick={handleNewBug}>
+                          Report Bug
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
 
@@ -297,11 +472,11 @@ const RepoBugs = () => {
 
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span>Reported by {bug.reportedBy}</span>
+                      <span>Reported by {bug.reporter}</span>
                       <span>•</span>
                       <span>Assigned to {bug.assignee}</span>
                       <span>•</span>
-                      <span>{bug.created}</span>
+                      <span>{new Date(bug.createdAt).toLocaleDateString()}</span>
                     </div>
                     <div className="flex gap-1">
                       {bug.labels.map((label, labelIndex) => (

@@ -40,7 +40,6 @@
     "node-fetch": "^3.3.2",
     "ora": "^8.0.1",
     "prompts": "^2.4.2",
-    "puppeteer-core": "^24.22.3",
     "semver": "^7.6.3",
     "yaml": "^2.5.1",
     "yargs": "^17.7.2"
@@ -55,6 +54,7 @@
     "esbuild": "^0.23.0",
     "eslint": "^9.0.0",
     "husky": "^9.1.7",
+    "puppeteer-core": "^24.22.3",
     "typescript": "^5.4.5"
   },
   "engines": {

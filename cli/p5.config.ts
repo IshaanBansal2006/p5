@@ -1,7 +1,7 @@
 export default {
   "project": {
     "name": "p5",
-    "tagline": "the 5th man",
+    "tagline": "The 5th Man",
     "repo": "IshaanBansal2006/p5",
     "demoUrl": ""
   },

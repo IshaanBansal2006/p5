@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { SquareCheck as CheckSquare, Square, Clock, User, Plus, Zap, Filter, Loader2 } from "lucide-react";
+import { SquareCheck as CheckSquare, Square, Clock, Plus, Zap, Filter, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import RepoLayout from "@/components/RepoLayout";
