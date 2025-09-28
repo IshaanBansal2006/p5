@@ -5,6 +5,7 @@ import { Terminal, Zap, Settings, FileText, BarChart3, Github, Copy, Check } fro
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
+import PlexusWrapper from "@/components/DynamicPlexus";
 
 
 const Home = () => {
@@ -48,8 +49,13 @@ const Home = () => {
   ];
 
   return (
+<>
+<div className="fixed inset-0 z-0">
+            <PlexusWrapper />
+        </div>
     <div className="min-h-screen bg-background">
       {/* Header */}
+      
       <header className="border-b border-border/40 backdrop-blur-sm bg-background/80 sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
@@ -81,15 +87,10 @@ const Home = () => {
 
       {/* Hero Section */}
       <section className="relative overflow-hidden py-20 lg:py-32">
-        <div className="absolute inset-0 bg-gradient-hero"></div>
-        <div className="absolute inset-0 opacity-20">
-          <Image
-            src="/hero-image.jpg"
-            alt="Developer workspace"
-            fill
-            className="object-cover"
-          />
-        </div>
+        <div className="absolute inset-0 "></div>
+        {/* <div className="absolute h-screen w-screen inset-0 opacity-90">
+        <PlexusWrapper />
+        </div> */}
         <div className="relative container mx-auto px-6 text-center">
           <div className="max-w-4xl mx-auto">
             <h1 className="text-5xl lg:text-7xl font-bold mb-6 text-white">
@@ -197,6 +198,7 @@ const Home = () => {
         </div>
       </footer>
     </div>
+    </>
   );
 };
 
