@@ -291,7 +291,7 @@ export async function cmdDevpostGen(args: DevpostArgs): Promise<void> {
     let devpostData: DevpostResponse;
     try {
       devpostData = await callDevpostAPI(owner, repo, serverUrl);
-      console.log('DEBUG: API call successful');
+      
     } catch (apiError) {
       spinner.fail('API call failed');
       console.log('DEBUG: API call failed with error:', apiError);

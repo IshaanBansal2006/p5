@@ -1,6 +1,6 @@
 # p5
 
-p5
+player5 is a comprehensive hackathon development platform that automates the tedious parts of hackathon development, letting teams focus on building amazing projects instead of managing builds, documentation, and deployments.
 
 ## Features
 
@@ -83,3 +83,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Repository:** [p5](https://github.com/IshaanBansal2006/p5)
+
+---
+
+*This README was automatically generated from repository analysis on 9/28/2025*

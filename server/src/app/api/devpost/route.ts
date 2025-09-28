@@ -228,11 +228,11 @@ async function generateDevpost(repoData: RepoData, readmeContent: string | null,
   
   // Create a rich, contextual prompt
   const contextualPrompt = `
-You are an expert at writing compelling Devpost submissions. Create a unique, engaging devpost for this GitHub repository that tells the authentic story behind the project.
+You are an expert at writing compelling Devpost submissions. Create a unique, engaging devpost for this GitHub repository that tells the authentic story behind the project. Make it super interesting and each section should be at least 4 sentences long. Make the user sound very technically impressive.
 
-REPOSITORY ANALYSIS:
-- Name: ${repoData.name}
-- Description: ${repoData.description || 'No description provided'}
+REPOSITORY ANALYSIS: Make it super interesting and each section should be at least 4 sentences long. Make the user sound very technically impressive.
+- Name: ${repoData.name} Make it super interesting and each section should be at least 4 sentences long. Make the user sound very technically impressive.
+- Make it super interesting and each section should be at least 4 sentences long. Make the user sound very technically impressive. Description: ${repoData.description || 'No description provided'}
 - Primary Language: ${repoData.language || 'Not specified'}
 - Stars: ${repoData.stargazers_count || 0}
 - Forks: ${repoData.forks_count || 0}
@@ -280,7 +280,7 @@ Write a compelling, authentic devpost that:
 
 8. **BUILT WITH**: Create a comprehensive, well-organized list that goes beyond just the main languages. Include frameworks, libraries, services, tools, platforms, but don't include useless packages that aren't truly impactful used or any node modules.
 
-Make each section feel authentic and specific to this project. Vary your writing style between sections - some can be more technical, others more storytelling. Write as if you're genuinely passionate about what you built.
+Make each section feel authentic and specific to this project. Vary your writing style between sections - some can be more technical, others more storytelling. Write as if you're genuinely passionate about what you built. Each section should be at least 3-5 sections, MAKE THEM INTERESTING PLEASE
 
 Return ONLY a JSON object with these exact keys: inspiration, what_it_does, how_built, challenges, accomplishments, learned, whats_next, built_with_list (as array), name, github_url
 `;
@@ -410,16 +410,16 @@ export async function GET(request: NextRequest) {
     const devpostKey = `devpost-${owner}-${repo}`;
     const existingDevpost = await redis.get(devpostKey);
     
-    if (existingDevpost) {
-      return NextResponse.json(
-        { 
-          message: `Devpost for ${owner}/${repo} already exists`,
-          data: JSON.parse(existingDevpost),
-          cached: true
-        },
-        { status: 200 }
-      );
-    }
+    // if (existingDevpost) {
+    //   return NextResponse.json(
+    //     { 
+    //       message: `Devpost for ${owner}/${repo} already exists`,
+    //       data: JSON.parse(existingDevpost),
+    //       cached: true
+    //     },
+    //     { status: 200 }
+    //   );
+    // }
 
     // Fetch repository data from GitHub
     const repoData = await fetchGitHubRepo(owner, repo);
@@ -434,9 +434,9 @@ export async function GET(request: NextRequest) {
     const devpostData = await generateDevpost(repoData, readmeContent, techStack);
     
     // Store in Redis for future requests
-    await redis.set(devpostKey, JSON.stringify(devpostData), {
-      EX: 3600 // Cache for 1 hour
-    });
+    // await redis.set(devpostKey, JSON.stringify(devpostData), {
+    //   EX: 0 // Cache for 1 hour
+    // });
 
     // Format the response as requested
     const formattedDevpost = `## Inspiration
