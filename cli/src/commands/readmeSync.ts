@@ -93,12 +93,24 @@ async function callReadmeAPI(owner: string, repo: string, serverUrl: string): Pr
     throw new Error(`API Error ${response.status}: ${errorData.error || response.statusText}`);
   }
   
-  return await response.json();
+  const data = await response.json();
+  
+  // Validate that we have the required readme content
+  if (!data.readme || typeof data.readme !== 'string') {
+    throw new Error('API response missing valid readme content');
+  }
+  
+  return data;
 }
 
 // Create/update README.md file
 async function createReadmeFile(readmeData: ReadmeResponse, projectRoot: string): Promise<string> {
   const readmePath = path.join(projectRoot, 'README.md');
+  
+  // Validate readme content exists and is a string
+  if (!readmeData.readme || typeof readmeData.readme !== 'string') {
+    throw new Error('No valid README content provided');
+  }
   
   // Check if README already exists
   let existingReadme = '';
@@ -183,14 +195,25 @@ export async function cmdReadmeSync(args: ReadmeArgs): Promise<void> {
     console.log(chalk.green('\n✅ README Sync Complete!'));
     console.log(chalk.cyan(`📁 File ${action}: ${path.join(projectRoot, 'README.md')}`));
     console.log(chalk.gray(`🔗 Repository: ${readmeData.github_url}`));
-    console.log(chalk.gray(`📋 Features: ${readmeData.raw_data.features.length} key features identified`));
-    console.log(chalk.gray(`🛠️  Tech Stack: ${readmeData.raw_data.tech_stack.slice(0, 5).join(', ')}${readmeData.raw_data.tech_stack.length > 5 ? '...' : ''}`));
+    
+    // Safe access to raw_data properties
+    if (readmeData.raw_data) {
+      if (readmeData.raw_data.features?.length) {
+        console.log(chalk.gray(`📋 Features: ${readmeData.raw_data.features.length} key features identified`));
+      }
+      
+      if (readmeData.raw_data.tech_stack?.length) {
+        const displayStack = readmeData.raw_data.tech_stack.slice(0, 5).join(', ');
+        const extraCount = readmeData.raw_data.tech_stack.length > 5 ? `...+${readmeData.raw_data.tech_stack.length - 5} more` : '';
+        console.log(chalk.gray(`🛠️  Tech Stack: ${displayStack}${extraCount}`));
+      }
+    }
     
   } catch (error) {
     spinner.fail('Failed to sync README');
     
     if (error instanceof Error) {
-      if (error.message.includes('fetch')) {
+      if (error.message.includes('fetch') || error.message.includes('ECONNREFUSED')) {
         console.error(chalk.red('\n❌ Could not connect to server'));
         console.log(chalk.yellow('💡 Make sure your Next.js server is running:'));
         console.log(chalk.cyan('   cd server && npm run dev'));
@@ -198,6 +221,9 @@ export async function cmdReadmeSync(args: ReadmeArgs): Promise<void> {
         console.error(chalk.red('\n❌ Repository not found on GitHub'));
       } else if (error.message.includes('409')) {
         console.error(chalk.red('\n❌ Repository already has a cached README - try a different repo'));
+      } else if (error.message.includes('API response missing valid readme content')) {
+        console.error(chalk.red('\n❌ Server returned invalid README data'));
+        console.log(chalk.yellow('💡 This might be a server-side issue. Try again in a moment.'));
       } else {
         console.error(chalk.red('\n❌ Error:'), error.message);
       }

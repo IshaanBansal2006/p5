@@ -35,6 +35,47 @@ interface ReadmeData {
   github_url: string;
 }
 
+// Function to format README data into markdown
+function formatReadmeMarkdown(data: ReadmeData): string {
+  return `# ${data.title}
+
+${data.description}
+
+## Features
+
+${data.features.map(feature => `- ${feature}`).join('\n')}
+
+## Installation
+
+${data.installation}
+
+## Usage
+
+${data.usage}
+
+${data.api_documentation}
+
+## Contributing
+
+${data.contributing}
+
+## License
+
+${data.license}
+
+## Acknowledgments
+
+${data.acknowledgments}
+
+## Tech Stack
+
+${data.tech_stack.map(tech => `- ${tech}`).join('\n')}
+
+---
+
+**Repository:** [${data.name}](${data.github_url})`;
+}
+
 // Function to fetch GitHub repository data
 async function fetchGitHubRepo(owner: string, repo: string) {
   try {
@@ -388,10 +429,17 @@ export async function GET(request: NextRequest) {
     const existingReadme = await redis.get(readmeKey);
     
     if (existingReadme) {
+      const cachedData = JSON.parse(existingReadme);
+      
+      // Format cached data to match the expected response structure
+      const formattedReadme = formatReadmeMarkdown(cachedData);
+
       return NextResponse.json(
         { 
-          message: `README for ${owner}/${repo} already exists`,
-          data: JSON.parse(existingReadme),
+          message: `README for ${owner}/${repo} retrieved from cache`,
+          github_url: cachedData.github_url,
+          readme: formattedReadme,
+          raw_data: cachedData,
           cached: true
         },
         { status: 200 }
@@ -416,43 +464,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Format the response as a complete README
-    const formattedReadme = `# ${readmeData.title}
-
-${readmeData.description}
-
-## Features
-
-${readmeData.features.map(feature => `- ${feature}`).join('\n')}
-
-## Installation
-
-${readmeData.installation}
-
-## Usage
-
-${readmeData.usage}
-
-${readmeData.api_documentation}
-
-## Contributing
-
-${readmeData.contributing}
-
-## License
-
-${readmeData.license}
-
-## Acknowledgments
-
-${readmeData.acknowledgments}
-
-## Tech Stack
-
-${readmeData.tech_stack.map(tech => `- ${tech}`).join('\n')}
-
----
-
-**Repository:** [${readmeData.name}](${readmeData.github_url})`;
+    const formattedReadme = formatReadmeMarkdown(readmeData);
 
     return NextResponse.json(
       {
