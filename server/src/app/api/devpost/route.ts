@@ -334,6 +334,7 @@ Return ONLY a JSON object with these exact keys: inspiration, what_it_does, how_
   }
 
   // Enhanced placeholder with more dynamic content based on actual repo data
+  console.log("WE ARE GOING MANUAL")
   const primaryLang = repoData.language || 'JavaScript';
   const repoAge = Math.floor((new Date().getTime() - new Date(repoData.created_at).getTime()) / (1000 * 60 * 60 * 24));
   const isPopular = repoData.stargazers_count > 50;
