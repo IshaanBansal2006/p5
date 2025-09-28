@@ -70,29 +70,49 @@ export async function runCLI(): Promise<void> {
       }
     )
     .command(
-      'devpost gen [owner] [repo]',
-      'Generate Devpost draft',
+      'devpost', // Base command for devpost
+      'Devpost utilities',
       (yargs) => {
-        return yargs
-          .positional('owner', {
-            describe: 'GitHub repository owner',
-            type: 'string'
-          })
-          .positional('repo', {
-            describe: 'GitHub repository name',
-            type: 'string'
-          })
-          .option('server', {
-            alias: 's',
-            describe: 'Server URL for devpost API',
-            type: 'string',
-            default: 'https://www.player5.dev'
-          });
-      },
-      async (args) => {
-        await cmdDevpostGen(args);
+        // Sub-command for 'gen'
+        return yargs.command(
+          // Updated command: 'gen [action] [owner] [repo]'
+          'gen [action] [owner] [repo]',
+          'Generate Devpost draft (use "new" for localhost testing)',
+          (yargs) => {
+            return yargs
+              .positional('action', { // Added new positional argument
+                describe: 'Action to perform (e.g., "new")',
+                type: 'string',
+                choices: ['new'],
+                default: undefined
+              })
+              .positional('owner', {
+                describe: 'GitHub repository owner',
+                type: 'string'
+              })
+              .positional('repo', {
+                describe: 'GitHub repository name',
+                type: 'string'
+              })
+              .option('server', {
+                alias: 's',
+                describe: 'Server URL for devpost API',
+                type: 'string',
+                default: 'https://www.player5.dev'
+              });
+          },
+          async (args) => {
+            // Logic to override the server option if 'action' is 'new'
+            if (args.action === 'new') {
+              args.server = 'http://localhost:3000';
+            }
+            
+            // The rest of the arguments (owner, repo, server, etc.) are passed along
+            await cmdDevpostGen(args);
+          }
+        ).demandCommand(1, 'Please specify a devpost subcommand like "gen"'); // Ensure a subcommand is provided
       }
-    )
+    ) // The 'devpost' command block ends here
     .command(
       'readme sync [owner] [repo]',
       'Generate and sync README.md file',
