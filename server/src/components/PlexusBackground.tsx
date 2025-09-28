@@ -10,7 +10,7 @@ const sketch = (p: p5) => {
     const NUM_PARTICLES = 300;
     const MAX_DISTANCE = 110;
     const MOVE_SPEED = 1.0;
-    const PARTICLE_COLOR = [255, 215, 0]; // Soft Gold/Yellow
+    const PARTICLE_COLOR = [237, 114, 47]; // Soft Gold/Yellow
 
     class Particle {
         x: number;
