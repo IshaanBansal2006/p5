@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import Redis from 'ioredis';
 
 // Types for the incoming data structure
 interface DetailedError {
@@ -81,15 +80,6 @@ interface RepositoryData {
   }>;
 }
 
-// Initialize Redis client with environment variables
-const redis = new Redis({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379'),
-  password: process.env.REDIS_PASSWORD || undefined,
-  connectTimeout: 10000,
-  lazyConnect: true,
-  maxRetriesPerRequest: 3,
-});
 
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
@@ -201,7 +191,6 @@ RESPONSE FORMAT (JSON only, no markdown):
       errorType: string;
     }, index: number) => {
       const now = new Date().toISOString();
-      const bugId = generateBugId(error.title);
       
       // Create a comprehensive description that includes the suggested fix
       let fullDescription = error.description;
@@ -219,7 +208,7 @@ RESPONSE FORMAT (JSON only, no markdown):
       }
       
       return {
-        id: bugId,
+        id: '', // Will be assigned by addBug endpoint
         title: error.title,
         description: fullDescription,
         severity: error.severity as 'low' | 'medium' | 'high' | 'critical',
@@ -275,8 +264,6 @@ RESPONSE FORMAT (JSON only, no markdown):
           ? `${curr.taskName} Error: ${curr.message.substring(0, 60)}...`
           : `${curr.taskName} Error: ${curr.message}`;
         
-        const bugId = generateBugId(title, curr.message);
-        
         // Create a comprehensive description
         let description = `Error in ${curr.taskName}: ${curr.message}`;
         if (curr.location?.file) {
@@ -297,7 +284,7 @@ RESPONSE FORMAT (JSON only, no markdown):
         }
         
         acc.push({
-          id: bugId,
+          id: '', // Will be assigned by addBug endpoint
           title: title,
           description: description,
           severity: severity,
@@ -318,16 +305,6 @@ RESPONSE FORMAT (JSON only, no markdown):
 }
 
 
-// Helper function to generate meaningful bug IDs
-function generateBugId(title: string, message?: string): string {
-  const source = title || message || 'unknown-error';
-  const errorHash = source.toLowerCase()
-    .replace(/[^a-z0-9]/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-    .substring(0, 30);
-  return `bug-${errorHash}-${Date.now().toString().slice(-6)}`;
-}
 
 // Helper function to map original severity to bug severity scale
 function mapSeverityToBugSeverity(
@@ -363,105 +340,62 @@ function mapSeverityToBugSeverity(
   return 'low';
 }
 
-// FIXED: Function to get existing data from Redis (using string operations instead of hash)
-async function getRepositoryData(owner: string, repo: string): Promise<RepositoryData> {
+
+// Function to call addBug endpoint for each processed bug
+async function addBugsViaAPI(owner: string, repo: string, bugs: Bug[]): Promise<{
+  success: boolean;
+  addedBugs: Bug[];
+  totalBugs: number;
+  error?: string;
+}> {
   try {
-    const key = `${owner}-${repo}`;
-    
-    // First, check what type of data exists at this key
-    const keyType = await redis.type(key);
-    console.log(`Key ${key} has type: ${keyType}`);
-    
-    if (keyType === 'none') {
-      // Key doesn't exist, return default structure
-      return { bugs: [], tasks: [] };
-    }
-    
-    let data: string | null = null;
-    
-    if (keyType === 'string') {
-      // Key contains string data (our new format)
-      data = await redis.get(key);
-    } else if (keyType === 'hash') {
-      // Key contains hash data (old format) - migrate it
-      console.log(`Migrating hash data to string format for key: ${key}`);
-      const hashData = await redis.hget(key, 'bugs');
-      if (hashData) {
-        const bugs = JSON.parse(hashData);
-        const migratedData = { bugs, tasks: [] };
-        // Save in new format and delete old hash
-        await redis.set(key, JSON.stringify(migratedData));
-        await redis.del(`${key}_old`); // Delete old hash structure
-        return migratedData;
-      }
-    } else {
-      // Key contains unexpected data type - delete and start fresh
-      console.log(`Unexpected key type ${keyType} for ${key}, deleting and starting fresh`);
-      await redis.del(key);
-      return { bugs: [], tasks: [] };
+    // Convert Bug[] to the format expected by addBug endpoint
+    const bugsForAddBug = bugs.map(bug => ({
+      title: bug.title,
+      description: bug.description,
+      severity: bug.severity,
+      status: bug.status,
+      assignee: bug.assignee,
+      reporter: bug.reporter,
+      labels: bug.labels
+    }));
+
+    // Make internal call to addBug endpoint
+    const addBugResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/addBug`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        owner,
+        repo,
+        bugs: bugsForAddBug
+      })
+    });
+
+    if (!addBugResponse.ok) {
+      const errorData = await addBugResponse.json();
+      throw new Error(`addBug API call failed: ${errorData.error || 'Unknown error'}`);
     }
 
-    if (!data) {
-      return { bugs: [], tasks: [] };
-    }
-
-    const parsed = JSON.parse(data);
+    const addBugResult = await addBugResponse.json();
     
-    // Ensure the parsed data has the expected structure
+    // Return the bugs with their new sequential IDs
     return {
-      bugs: Array.isArray(parsed.bugs) ? parsed.bugs : [],
-      tasks: Array.isArray(parsed.tasks) ? parsed.tasks : []
+      success: true,
+      addedBugs: addBugResult.bugs || [],
+      totalBugs: addBugResult.totalBugs || 0
     };
-    
+
   } catch (error) {
-    console.error('Error getting data from Redis:', error);
-    return { bugs: [], tasks: [] };
+    console.error('Error calling addBug API:', error);
+    return {
+      success: false,
+      addedBugs: [],
+      totalBugs: 0,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
   }
-}
-
-// FIXED: Function to save data to Redis (using string operations instead of hash)
-async function saveRepositoryData(owner: string, repo: string, data: RepositoryData): Promise<void> {
-  try {
-    const key = `${owner}-${repo}`;
-    
-    // Save as JSON string instead of hash
-    await redis.set(key, JSON.stringify(data));
-    
-    // Set expiration (optional - 30 days)
-    await redis.expire(key, 30 * 24 * 60 * 60);
-    
-    console.log(`Saved ${data.bugs.length} bugs and ${data.tasks.length} tasks to Redis for ${owner}/${repo}`);
-  } catch (error) {
-    console.error('Error saving data to Redis:', error);
-    throw error;
-  }
-}
-
-// Function to merge new bugs with existing ones
-function mergeBugs(existingBugs: Bug[], newBugs: Bug[]): Bug[] {
-  const merged = [...existingBugs];
-  
-  for (const newBug of newBugs) {
-    const existingIndex = merged.findIndex(bug => 
-      bug.title === newBug.title &&
-      bug.description === newBug.description
-    );
-
-    if (existingIndex >= 0) {
-      // Update existing bug
-      merged[existingIndex] = {
-        ...merged[existingIndex],
-        updatedAt: newBug.updatedAt,
-        severity: newBug.severity, // Update severity in case it changed
-        status: newBug.status // Update status in case it changed
-      };
-    } else {
-      // Add new bug
-      merged.push(newBug);
-    }
-  }
-
-  return merged;
 }
 
 // Main API handler
@@ -515,36 +449,36 @@ export async function POST(request: NextRequest) {
     });
     console.log(`Total unique bugs processed: ${processedBugs.length}\n`);
 
-    // Step 2: Get existing data from Redis
-    const existingData = await getRepositoryData(owner, repo);
-
-    // Step 3: Merge new bugs with existing ones
-    const mergedBugs = mergeBugs(existingData.bugs, processedBugs);
+    // Step 2: Add bugs via addBug API to ensure consistent numbering
+    const addBugResult = await addBugsViaAPI(owner, repo, processedBugs);
     
-    // Log merge results
-    console.log(`=== MERGE RESULTS ===`);
-    console.log(`Existing bugs in DB: ${existingData.bugs.length}`);
-    console.log(`New unique bugs: ${processedBugs.length}`);
-    console.log(`Total after merge: ${mergedBugs.length}`);
+    if (!addBugResult.success) {
+      return NextResponse.json(
+        { 
+          error: 'Failed to add bugs to repository',
+          details: addBugResult.error
+        },
+        { status: 500 }
+      );
+    }
+    
+    // Log results
+    console.log(`=== BUG ADDITION RESULTS ===`);
+    console.log(`Processed unique bugs: ${processedBugs.length}`);
+    console.log(`Successfully added bugs: ${addBugResult.addedBugs.length}`);
+    console.log(`Total bugs in repository: ${addBugResult.totalBugs}`);
     console.log('');
 
-    // Step 4: Save back to Redis (preserve tasks)
-    const updatedData: RepositoryData = {
-      bugs: mergedBugs,
-      tasks: existingData.tasks // Preserve existing tasks
-    };
-    
-    await saveRepositoryData(owner, repo, updatedData);
-
-    // Step 5: Prepare response with insights
-    const criticalBugs = mergedBugs.filter(b => b.severity === 'critical');
-    const highPriorityBugs = mergedBugs.filter(b => b.severity === 'high');
-    const mediumPriorityBugs = mergedBugs.filter(b => b.severity === 'medium');
-    const lowPriorityBugs = mergedBugs.filter(b => b.severity === 'low');
+    // Step 3: Prepare response with insights
+    const criticalBugs = addBugResult.addedBugs.filter(b => b.severity === 'critical');
+    const highPriorityBugs = addBugResult.addedBugs.filter(b => b.severity === 'high');
+    const mediumPriorityBugs = addBugResult.addedBugs.filter(b => b.severity === 'medium');
+    const lowPriorityBugs = addBugResult.addedBugs.filter(b => b.severity === 'low');
 
     const insights = [
       `Processed ${errorCollection.errors.length} errors into ${processedBugs.length} unique bugs`,
-      `Total bugs in repository: ${mergedBugs.length}`,
+      `Successfully added ${addBugResult.addedBugs.length} bugs to repository`,
+      `Total bugs in repository: ${addBugResult.totalBugs}`,
       `Severity breakdown: ${criticalBugs.length} critical, ${highPriorityBugs.length} high, ${mediumPriorityBugs.length} medium, ${lowPriorityBugs.length} low`
     ];
 
@@ -567,7 +501,8 @@ export async function POST(request: NextRequest) {
       processed: {
         original: errorCollection.errors.length,
         unique: processedBugs.length,
-        total: mergedBugs.length
+        added: addBugResult.addedBugs.length,
+        total: addBugResult.totalBugs
       },
       priority: {
         critical: criticalBugs.length,
@@ -582,8 +517,8 @@ export async function POST(request: NextRequest) {
         repo,
         lastUpdated: new Date().toISOString()
       },
-      // Add the detailed unique bugs to the response
-      uniqueBugs: processedBugs.map(bug => ({
+      // Add the detailed added bugs to the response (with consistent sequential IDs)
+      addedBugs: addBugResult.addedBugs.map(bug => ({
         id: bug.id,
         title: bug.title,
         description: bug.description,
@@ -609,7 +544,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// FIXED: GET endpoint to retrieve current data for a repository
+// GET endpoint to retrieve current data for a repository via addBug endpoint
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -623,24 +558,34 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const data = await getRepositoryData(owner, repo);
+    // Use addBug endpoint to get repository data
+    const addBugResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/addBug?owner=${owner}&repo=${repo}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
+
+    if (!addBugResponse.ok) {
+      const errorData = await addBugResponse.json();
+      throw new Error(`Failed to fetch repository data: ${errorData.error || 'Unknown error'}`);
+    }
+
+    const data = await addBugResponse.json();
     
     return NextResponse.json({
       repository: { owner, repo },
-      totalBugs: data.bugs.length,
-      totalTasks: data.tasks.length,
-      bugs: data.bugs.map(bug => ({
-        ...bug,
-        // Don't expose internal IDs or sensitive data
-        rawOutput: undefined
-      })),
-      tasks: data.tasks
+      totalBugs: data.totalBugs || 0,
+      bugs: data.bugs || []
     });
 
   } catch (error) {
     console.error('Error in GET handler:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }
