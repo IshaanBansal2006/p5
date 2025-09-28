@@ -61,6 +61,7 @@ const Tasks = () => {
     description: "",
     priority: "medium",
     assignee: "",
+    reporter: "",
     dueDate: "",
     comments: ""
   });
@@ -193,7 +194,7 @@ const Tasks = () => {
             priority: newTaskData.priority,
             status: "todo",
             assignee: newTaskData.assignee || "unassigned",
-            reporter: "current_user",
+            reporter: newTaskData.reporter || "system",
             dueDate: newTaskData.dueDate,
             tags: newTaskData.comments ? newTaskData.comments.split(',').map(t => t.trim()) : []
           }]
@@ -216,6 +217,7 @@ const Tasks = () => {
         description: "",
         priority: "medium",
         assignee: "",
+        reporter: "",
         dueDate: "",
         comments: ""
       });
@@ -520,10 +522,20 @@ const Tasks = () => {
                           owner={owner as string}
                           repo={repo as string}
                         />
+                        </div>
                       </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="dueDate">Due Date</Label>
+                      <div>
+                        <ContributorSelect
+                          value={newTaskData.reporter}
+                          onChange={(value) => setNewTaskData(prev => ({ ...prev, reporter: value }))}
+                          placeholder="Select or type reporter"
+                          label="Reporter (Optional)"
+                          owner={owner as string}
+                          repo={repo as string}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="dueDate">Due Date (Optional)</Label>
                       <Input
                         id="dueDate"
                         type="date"
@@ -729,7 +741,14 @@ const Tasks = () => {
                           />
                         </div>
                         <span>•</span>
-                        <span>Reporter: {task.reporter}</span>
+                          <div className="flex items-center gap-2">
+                            <span>Reporter:</span>
+                            <ContributorDisplay
+                              assignee={task.reporter}
+                              owner={owner as string}
+                              repo={repo as string}
+                            />
+                          </div>
                         <span>•</span>
                         <span>{new Date(task.createdAt).toLocaleDateString()}</span>
                         {task.dueDate && (

@@ -540,12 +540,13 @@ const RepoBugs = () => {
                         </div>
                       </div>
                       <div>
-                        <Label htmlFor="reporter">Reporter</Label>
-                        <Input
-                          id="reporter"
+                        <ContributorSelect
                           value={newBugData.reporter}
-                          onChange={(e) => setNewBugData(prev => ({ ...prev, reporter: e.target.value }))}
-                          placeholder="Enter reporter name"
+                          onChange={(value) => setNewBugData(prev => ({ ...prev, reporter: value }))}
+                          placeholder="Select or type reporter"
+                          label="Reporter (Optional)"
+                          owner={owner as string}
+                          repo={repo as string}
                         />
                       </div>
                       <div>
@@ -713,7 +714,14 @@ const RepoBugs = () => {
 
                       <div className="flex items-center justify-between">
                         <div className={`flex items-center gap-4 text-sm text-muted-foreground ${bug.status === "resolved" || bug.status === "closed" ? "line-through" : ""}`}>
-                          <span>Reported by {bug.reporter}</span>
+                          <div className="flex items-center gap-2">
+                            <span>Reported by</span>
+                            <ContributorDisplay
+                              assignee={bug.reporter}
+                              owner={owner as string}
+                              repo={repo as string}
+                            />
+                          </div>
                           <span>•</span>
                           <div className="flex items-center gap-2">
                             <span>Assigned to</span>
