@@ -163,40 +163,40 @@ const RepoStats = () => {
     { 
       icon: GitCommit, 
       label: "Total Commits", 
-      value: statsData.stats.totalCommits.current.toString(), 
-      change: formatChange(statsData.stats.totalCommits.percentChange),
-      changeIcon: getChangeIcon(statsData.stats.totalCommits.percentChange),
-      changeColor: getChangeColor(statsData.stats.totalCommits.percentChange)
+      value: statsData.stats?.totalCommits?.current?.toString() || "0", 
+      change: formatChange(statsData.stats?.totalCommits?.percentChange || 0),
+      changeIcon: getChangeIcon(statsData.stats?.totalCommits?.percentChange || 0),
+      changeColor: getChangeColor(statsData.stats?.totalCommits?.percentChange || 0)
     },
     { 
       icon: Users, 
       label: "Contributors", 
-      value: statsData.stats.totalContributors.current.toString(), 
-      change: formatChange(statsData.stats.totalContributors.percentChange),
-      changeIcon: getChangeIcon(statsData.stats.totalContributors.percentChange),
-      changeColor: getChangeColor(statsData.stats.totalContributors.percentChange)
+      value: statsData.stats?.totalContributors?.current?.toString() || "0", 
+      change: formatChange(statsData.stats?.totalContributors?.percentChange || 0),
+      changeIcon: getChangeIcon(statsData.stats?.totalContributors?.percentChange || 0),
+      changeColor: getChangeColor(statsData.stats?.totalContributors?.percentChange || 0)
     },
     { 
       icon: GitBranch, 
       label: "Branches", 
-      value: statsData.stats.branches.current.toString(), 
-      change: formatChange(statsData.stats.branches.percentChange),
-      changeIcon: getChangeIcon(statsData.stats.branches.percentChange),
-      changeColor: getChangeColor(statsData.stats.branches.percentChange)
+      value: statsData.stats?.branches?.current?.toString() || "0", 
+      change: formatChange(statsData.stats?.branches?.percentChange || 0),
+      changeIcon: getChangeIcon(statsData.stats?.branches?.percentChange || 0),
+      changeColor: getChangeColor(statsData.stats?.branches?.percentChange || 0)
     },
     { 
       icon: Star, 
       label: "Lines of Code", 
-      value: statsData.stats.totalLinesOfCode.current.toString(), 
-      change: formatChange(statsData.stats.totalLinesOfCode.percentChange),
-      changeIcon: getChangeIcon(statsData.stats.totalLinesOfCode.percentChange),
-      changeColor: getChangeColor(statsData.stats.totalLinesOfCode.percentChange)
+      value: statsData.stats?.totalLinesOfCode?.current?.toString() || "0", 
+      change: formatChange(statsData.stats?.totalLinesOfCode?.percentChange || 0),
+      changeIcon: getChangeIcon(statsData.stats?.totalLinesOfCode?.percentChange || 0),
+      changeColor: getChangeColor(statsData.stats?.totalLinesOfCode?.percentChange || 0)
     },
   ];
 
   // Process time series data for the line chart (total lines of code over commits)
-  const timeSeriesData = statsData.timeSeriesData.map((data, index) => {
-    const cumulativeLines = statsData.timeSeriesData
+  const timeSeriesData = (statsData.timeSeriesData || []).map((data, index) => {
+    const cumulativeLines = (statsData.timeSeriesData || [])
       .slice(0, index + 1)
       .reduce((sum, d) => sum + d.linesAdded - d.linesDeleted, 0);
     
@@ -209,7 +209,7 @@ const RepoStats = () => {
   });
 
   // Process recent commits (GitHub API returns most recent first)
-  const recentCommits = statsData.recentCommitHistory.map(commit => ({
+  const recentCommits = (statsData.recentCommitHistory || []).map(commit => ({
     author: commit.author,
     message: commit.message,
     time: formatTimeAgo(commit.date),
@@ -222,7 +222,7 @@ const RepoStats = () => {
   }));
 
   // Process contributors - use the contributor stats from the API which includes avatar URLs
-  const contributors = statsData.contributorStats
+  const contributors = (statsData.contributorStats || [])
     .map(contributor => ({
       name: contributor.name,
       commits: contributor.commits,
@@ -236,29 +236,29 @@ const RepoStats = () => {
   const awards = [
     {
       title: "Biggest Committer",
-      winner: statsData.awards.biggestCommitter.name,
-      value: `${statsData.awards.biggestCommitter.commits} commits`,
+      winner: statsData.awards?.biggestCommitter?.name || "Unknown",
+      value: `${statsData.awards?.biggestCommitter?.commits || 0} commits`,
       icon: Trophy,
       color: "text-yellow-500"
     },
     {
       title: "Biggest Merger",
-      winner: statsData.awards.biggestMerger.name,
-      value: `${statsData.awards.biggestMerger.merges} merges`,
+      winner: statsData.awards?.biggestMerger?.name || "Unknown",
+      value: `${statsData.awards?.biggestMerger?.merges || 0} merges`,
       icon: GitMerge,
       color: "text-blue-500"
     },
     {
       title: "Tree Lover",
-      winner: statsData.awards.biggestBrancher.name,
-      value: `${statsData.awards.biggestBrancher.branches} branches`,
+      winner: statsData.awards?.biggestBrancher?.name || "Unknown",
+      value: `${statsData.awards?.biggestBrancher?.branches || 0} branches`,
       icon: GitBranch,
       color: "text-green-500"
     },
     {
       title: "Least Contributor",
-      winner: statsData.awards.leastContributor.name,
-      value: `${statsData.awards.leastContributor.commits} commits`,
+      winner: statsData.awards?.leastContributor?.name || "Unknown",
+      value: `${statsData.awards?.leastContributor?.commits || 0} commits`,
       icon: Award,
       color: "text-purple-500"
     }
@@ -273,7 +273,7 @@ const RepoStats = () => {
           <div>
             <p className="text-muted-foreground">Repository Statistics & Analytics</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Last updated: {new Date(statsData.generatedAt).toLocaleString()}
+              Last updated: {statsData.generatedAt ? new Date(statsData.generatedAt).toLocaleString() : 'Unknown'}
             </p>
           </div>
           <a 
@@ -381,7 +381,7 @@ const RepoStats = () => {
                   <span className="text-muted-foreground">Cumulative Lines of Code</span>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {statsData.stats.commitsAnalyzed} commits analyzed
+                  {statsData.stats?.commitsAnalyzed || 0} commits analyzed
                 </div>
               </div>
             </Card>

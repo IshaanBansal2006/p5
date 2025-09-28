@@ -14,6 +14,7 @@ import { useParams } from "next/navigation";
 import RepoLayout from "@/components/RepoLayout";
 import { ContributorSelect } from "@/components/ui/contributor-select";
 import { ContributorDisplay } from "@/components/ui/contributor-display";
+import { TruncatedText } from "@/components/ui/truncated-text";
 
 // Task interface definition
 interface TaskComment {
@@ -761,8 +762,13 @@ const Tasks = () => {
                     </div>
 
                     {task.description && (
-                      <div className={`mb-3 text-sm text-muted-foreground ${task.status === "completed" ? "line-through" : ""}`}>
-                        {task.description}
+                      <div className="mb-3">
+                        <TruncatedText
+                          text={task.description}
+                          maxLines={3}
+                          className={`text-sm text-muted-foreground ${task.status === "completed" ? "line-through" : ""}`}
+                          hoverClassName="bg-muted/50 rounded-md p-2 -m-2"
+                        />
                       </div>
                     )}
 

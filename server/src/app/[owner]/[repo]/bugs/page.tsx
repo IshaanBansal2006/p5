@@ -14,6 +14,7 @@ import { useParams } from "next/navigation";
 import RepoLayout from "@/components/RepoLayout";
 import { ContributorSelect } from "@/components/ui/contributor-select";
 import { ContributorDisplay } from "@/components/ui/contributor-display";
+import { TruncatedText } from "@/components/ui/truncated-text";
 
 // Bug interface definition
 interface Bug {
@@ -767,8 +768,13 @@ const RepoBugs = () => {
                       </div>
 
                       {bug.description && bug.description.trim() !== ' ' && (
-                        <div className={`mb-3 text-sm text-muted-foreground ${(bug.status === "resolved" || bug.status === "closed") ? "line-through" : ""}`}>
-                          {bug.description}
+                        <div className="mb-3">
+                          <TruncatedText
+                            text={bug.description}
+                            maxLines={3}
+                            className={`text-sm text-muted-foreground ${(bug.status === "resolved" || bug.status === "closed") ? "line-through" : ""}`}
+                            hoverClassName="bg-muted/50 rounded-md p-2 -m-2"
+                          />
                         </div>
                       )}
 

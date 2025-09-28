@@ -40,36 +40,45 @@ interface ErrorCollection {
   };
 }
 
-// Processed error with priority
-interface ProcessedError {
+// Standard Bug interface to match the rest of the application
+interface Bug {
   id: string;
-  taskName: string;
-  errorType: string;
-  severity: 'low' | 'medium' | 'high';
-  message: string;
-  priority: 'low' | 'medium' | 'high';
-  location?: {
-    file?: string;
-    line?: number;
-    column?: number;
-  };
-  firstSeen: string;
-  lastSeen: string;
-  occurrences: number;
-  category?: string;
-  suggestedFix?: string;
+  title: string;
+  description: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  status: 'open' | 'in-progress' | 'resolved' | 'closed';
+  assignee: string;
+  reporter: string;
+  createdAt: string;
+  updatedAt: string;
+  labels: string[];
+  checked: boolean;
 }
 
-// Redis data structure for repository bugs - Updated to match document structure
+// Repository data structure to match the standard schema
 interface RepositoryData {
-  bugs: ProcessedError[];
+  bugs: Bug[];
   tasks: Array<{
     id: string;
-    name: string;
-    description?: string;
-    status?: string;
-    [key: string]: unknown;
-  }>; // Add tasks array to match your document structure
+    title: string;
+    description: string;
+    priority: string;
+    status: string;
+    assignee: string;
+    reporter: string;
+    dueDate: string;
+    createdAt: string;
+    updatedAt: string;
+    tags: string[];
+    comments: Array<{
+      id: string;
+      author: string;
+      content: string;
+      createdAt: string;
+    }>;
+    completed: boolean;
+    checked: boolean;
+  }>;
 }
 
 // Initialize Redis client with environment variables
@@ -87,7 +96,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
 // Function to process errors with Gemini AI
-async function processErrorsWithGemini(errors: DetailedError[]): Promise<ProcessedError[]> {
+async function processErrorsWithGemini(errors: DetailedError[]): Promise<Bug[]> {
   try {
     // Prepare the error data for Gemini
     const errorSummary = errors.map((error, index) => ({
@@ -101,45 +110,63 @@ async function processErrorsWithGemini(errors: DetailedError[]): Promise<Process
     }));
 
     const prompt = `
-You are an expert code analysis assistant. I have a list of ${errors.length} code errors and warnings that need to be processed.
+You are an expert code analysis assistant. I have a list of ${errors.length} code errors and warnings that need to be processed and converted into bug reports.
 
 TASK: 
-1. Remove duplicates errors (same  messages)
-2. Assign severity ratings: "low", "medium", or "high" based on:
-   - HIGH: Build failures, type errors, runtime crashes, security issues
-   - MEDIUM: Linting errors, deprecated usage, performance issues
-   - LOW: Style warnings, minor linting issues, documentation warnings
-3. Categorize errors (e.g., "Type Error", "Lint Rule", "Build Issue", "Runtime Error")
-4. Suggest fixes where possible
+1. Remove duplicate errors (same messages)
+2. Assign severity ratings: "low", "medium", "high", or "critical" based on:
+   - CRITICAL: Security vulnerabilities, data loss, system crashes, critical build failures
+   - HIGH: Build failures, type errors, runtime crashes, blocking issues, test failures
+   - MEDIUM: Linting errors, deprecated usage, performance issues, warnings that could cause problems
+   - LOW: Style warnings, minor linting issues, documentation warnings, cosmetic issues
+3. Create meaningful bug titles (max 80 chars) that clearly describe the issue
+4. Write detailed descriptions that include:
+   - What the error is
+   - Where it occurs (file/line if available)
+   - Why it's happening
+   - Impact on the application
+5. Generate appropriate labels that categorize the bug (2-4 labels max)
+6. Provide actionable suggested fixes when possible
+
+FIELD REQUIREMENTS:
+- title: Clear, concise bug title (e.g., "TypeScript error: Missing return type annotation")
+- description: Detailed explanation with context and impact
+- severity: One of "low", "medium", "high", "critical"
+- labels: Array of 2-4 relevant tags (e.g., ["typescript", "typecheck", "error-handling"])
+- suggestedFix: Specific, actionable fix instructions
+- occurrences: Number of times this error appears
+- representativeLocation: Most common file/line where this occurs
+- taskName: The task that generated this error (lint, typecheck, build, test, website)
+- errorType: The type of error (lint, typecheck, build, test, website, unknown)
 
 ERRORS TO PROCESS:
 ${JSON.stringify(errorSummary, null, 2)}
 
 RESPONSE FORMAT (JSON only, no markdown):
 {
-  "uniqueErrors": [
+  "uniqueBugs": [
     {
-      "originalIndexes": [0, 5, 12],
-      "taskName": "lint",
-      "errorType": "lint",
-      "severity": "medium",
-      "message": "Combined/representative error message",
-      "priority": "medium",
-      "category": "Lint Rule",
-      "suggestedFix": "Add missing semicolon at end of statement",
+      "title": "TypeScript error: Missing return type annotation in User component",
+      "description": "The User component is missing a return type annotation for its render method. This causes TypeScript compilation to fail and prevents the build from completing. The error occurs in the main User component file and affects the entire application's type safety.",
+      "severity": "high",
+      "labels": ["typescript", "typecheck", "component", "type-safety"],
+      "suggestedFix": "Add explicit return type annotation: 'render(): JSX.Element' or 'render(): React.ReactElement'",
       "occurrences": 3,
       "representativeLocation": {
-        "file": "src/component.ts",
-        "line": 45
-      }
+        "file": "src/components/User.tsx",
+        "line": 15
+      },
+      "taskName": "typecheck",
+      "errorType": "typecheck"
     }
   ],
   "summary": {
     "originalCount": ${errors.length},
     "uniqueCount": 0,
-    "highPriority": 0,
-    "mediumPriority": 0,
-    "lowPriority": 0
+    "criticalCount": 0,
+    "highCount": 0,
+    "mediumCount": 0,
+    "lowCount": 0
   }
 }`;
 
@@ -158,90 +185,156 @@ RESPONSE FORMAT (JSON only, no markdown):
       throw new Error('Invalid JSON response from Gemini');
     }
 
-    // Convert Gemini's processed errors to our format
-    const processedErrors: ProcessedError[] = geminiResult.uniqueErrors.map((error: {
+    // Convert Gemini's processed errors to Bug format
+    const processedBugs: Bug[] = geminiResult.uniqueBugs.map((error: {
+      title: string;
+      description: string;
+      severity: string;
+      labels: string[];
+      suggestedFix?: string;
+      occurrences: number;
+      representativeLocation?: {
+        file?: string;
+        line?: number;
+      };
       taskName: string;
       errorType: string;
-      severity: string;
-      message: string;
-      priority: string;
-      [key: string]: unknown;
     }, index: number) => {
       const now = new Date().toISOString();
+      const bugId = generateBugId(error.title);
+      
+      // Create a comprehensive description that includes the suggested fix
+      let fullDescription = error.description;
+      if (error.suggestedFix) {
+        fullDescription += `\n\nSuggested Fix: ${error.suggestedFix}`;
+      }
+      if (error.representativeLocation?.file) {
+        fullDescription += `\n\nLocation: ${error.representativeLocation.file}`;
+        if (error.representativeLocation.line) {
+          fullDescription += `:${error.representativeLocation.line}`;
+        }
+      }
+      if (error.occurrences > 1) {
+        fullDescription += `\n\nThis issue occurs ${error.occurrences} times.`;
+      }
+      
       return {
-        id: `${Date.now()}-${index}`,
-        taskName: error.taskName,
-        errorType: error.errorType,
-        severity: error.severity, // This should now be 'low' | 'medium' | 'high'
-        message: error.message,
-        priority: error.priority, // Same as severity for consistency
-        location: error.representativeLocation,
-        firstSeen: now,
-        lastSeen: now,
-        occurrences: error.occurrences || 1,
-        category: error.category,
-        suggestedFix: error.suggestedFix
+        id: bugId,
+        title: error.title,
+        description: fullDescription,
+        severity: error.severity as 'low' | 'medium' | 'high' | 'critical',
+        status: 'open',
+        assignee: 'unassigned',
+        reporter: 'system',
+        createdAt: now,
+        updatedAt: now,
+        labels: error.labels || [],
+        checked: false
       };
     });
 
-    console.log(`Processed ${errors.length} errors into ${processedErrors.length} unique items`);
+    console.log(`Processed ${errors.length} errors into ${processedBugs.length} unique bugs`);
     
-    // Log summary of processed errors by priority
-    const priorityCounts = processedErrors.reduce((acc, error) => {
-      acc[error.severity] = (acc[error.severity] || 0) + 1;
+    // Log summary of processed bugs by severity
+    const severityCounts = processedBugs.reduce((acc, bug) => {
+      acc[bug.severity] = (acc[bug.severity] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
     
-    console.log('Priority breakdown:', priorityCounts);
+    console.log('Severity breakdown:', severityCounts);
     
-    return processedErrors;
+    return processedBugs;
 
   } catch (error) {
     console.error('Error processing with Gemini:', error);
     
     // Fallback: basic deduplication without AI
-    const uniqueErrors = errors.reduce((acc: ProcessedError[], curr, index) => {
-      const existing = acc.find(e => 
-        e.message === curr.message && 
-        e.taskName === curr.taskName &&
-        e.location?.file === curr.location?.file
+    const uniqueBugs = errors.reduce((acc: Bug[], curr, index) => {
+      const existing = acc.find(bug => 
+        bug.description.includes(curr.message) && 
+        bug.title.includes(curr.taskName)
       );
 
       if (existing) {
-        existing.occurrences += 1;
-        existing.lastSeen = curr.timestamp;
+        // Update occurrence count in description
+        const occurrenceMatch = existing.description.match(/This issue occurs (\d+) times/);
+        const currentCount = occurrenceMatch ? parseInt(occurrenceMatch[1]) : 1;
+        existing.description = existing.description.replace(
+          /This issue occurs \d+ times/, 
+          `This issue occurs ${currentCount + 1} times`
+        );
+        existing.updatedAt = new Date().toISOString();
       } else {
-        // Map original severity to our priority scale
-        const severity = mapSeverityToPriority(curr.severity, curr.taskName, curr.errorType);
+        // Map original severity to our severity scale
+        const severity = mapSeverityToBugSeverity(curr.severity, curr.taskName, curr.errorType);
+        
+        const now = new Date().toISOString();
+        
+        // Create a better title from the error message
+        const title = curr.message.length > 60 
+          ? `${curr.taskName} Error: ${curr.message.substring(0, 60)}...`
+          : `${curr.taskName} Error: ${curr.message}`;
+        
+        const bugId = generateBugId(title, curr.message);
+        
+        // Create a comprehensive description
+        let description = `Error in ${curr.taskName}: ${curr.message}`;
+        if (curr.location?.file) {
+          description += `\n\nLocation: ${curr.location.file}`;
+          if (curr.location.line) {
+            description += `:${curr.location.line}`;
+          }
+        }
+        description += `\n\nThis error was detected during the ${curr.taskName} phase of the build process.`;
+        
+        // Generate appropriate labels
+        const labels = [curr.taskName, curr.errorType];
+        if (curr.location?.file) {
+          const fileExt = curr.location.file.split('.').pop();
+          if (fileExt && ['ts', 'tsx', 'js', 'jsx'].includes(fileExt)) {
+            labels.push('javascript', 'typescript');
+          }
+        }
         
         acc.push({
-          id: `fallback-${Date.now()}-${index}`,
-          taskName: curr.taskName,
-          errorType: curr.errorType,
+          id: bugId,
+          title: title,
+          description: description,
           severity: severity,
-          message: curr.message,
-          priority: severity, // Same as severity for consistency
-          location: curr.location,
-          firstSeen: curr.timestamp,
-          lastSeen: curr.timestamp,
-          occurrences: 1,
-          category: `${curr.taskName} issue`
+          status: 'open',
+          assignee: 'unassigned',
+          reporter: 'system',
+          createdAt: now,
+          updatedAt: now,
+          labels: labels,
+          checked: false
         });
       }
       return acc;
     }, []);
 
-    return uniqueErrors.length > 0 ? uniqueErrors : [];
+    return uniqueBugs;
   }
 }
 
 
-// Helper function to map original severity to priority scale
-function mapSeverityToPriority(
+// Helper function to generate meaningful bug IDs
+function generateBugId(title: string, message?: string): string {
+  const source = title || message || 'unknown-error';
+  const errorHash = source.toLowerCase()
+    .replace(/[^a-z0-9]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .substring(0, 30);
+  return `bug-${errorHash}-${Date.now().toString().slice(-6)}`;
+}
+
+// Helper function to map original severity to bug severity scale
+function mapSeverityToBugSeverity(
   originalSeverity: 'error' | 'warning', 
   taskName: string, 
   errorType: string
-): 'low' | 'medium' | 'high' {
+): 'low' | 'medium' | 'high' | 'critical' {
   // High priority conditions
   if (originalSeverity == 'error') {
     if (taskName === 'build' || taskName === 'typecheck') {
@@ -345,24 +438,22 @@ async function saveRepositoryData(owner: string, repo: string, data: RepositoryD
 }
 
 // Function to merge new bugs with existing ones
-function mergeBugs(existingBugs: ProcessedError[], newBugs: ProcessedError[]): ProcessedError[] {
+function mergeBugs(existingBugs: Bug[], newBugs: Bug[]): Bug[] {
   const merged = [...existingBugs];
   
   for (const newBug of newBugs) {
     const existingIndex = merged.findIndex(bug => 
-      bug.message === newBug.message &&
-      bug.taskName === newBug.taskName &&
-      bug.location?.file === newBug.location?.file &&
-      bug.location?.line === newBug.location?.line
+      bug.title === newBug.title &&
+      bug.description === newBug.description
     );
 
     if (existingIndex >= 0) {
       // Update existing bug
       merged[existingIndex] = {
         ...merged[existingIndex],
-        lastSeen: newBug.lastSeen,
-        occurrences: merged[existingIndex].occurrences + newBug.occurrences,
-        priority: newBug.priority // Update priority in case it changed
+        updatedAt: newBug.updatedAt,
+        severity: newBug.severity, // Update severity in case it changed
+        status: newBug.status // Update status in case it changed
       };
     } else {
       // Add new bug
@@ -410,33 +501,30 @@ export async function POST(request: NextRequest) {
     console.log(`Total raw errors: ${errorCollection.errors.length}\n`);
 
     // Step 1: Process errors with Gemini AI
-    const processedErrors = await processErrorsWithGemini(errorCollection.errors);
+    const processedBugs = await processErrorsWithGemini(errorCollection.errors);
     
-    // Log the unique processed errors
-    console.log('\n=== PROCESSED UNIQUE ERRORS ===');
-    processedErrors.forEach((error, index) => {
-      console.log(`${index + 1}. [${error.severity.toUpperCase()}] ${error.taskName}:`);
-      console.log(`   Message: ${error.message}`);
-      console.log(`   Category: ${error.category || 'N/A'}`);
-      console.log(`   Location: ${error.location?.file || 'N/A'}:${error.location?.line || 'N/A'}`);
-      console.log(`   Occurrences: ${error.occurrences}`);
-      if (error.suggestedFix) {
-        console.log(`   Fix: ${error.suggestedFix}`);
-      }
+    // Log the unique processed bugs
+    console.log('\n=== PROCESSED UNIQUE BUGS ===');
+    processedBugs.forEach((bug, index) => {
+      console.log(`${index + 1}. [${bug.severity.toUpperCase()}] ${bug.title}:`);
+      console.log(`   Description: ${bug.description.substring(0, 100)}${bug.description.length > 100 ? '...' : ''}`);
+      console.log(`   Labels: ${bug.labels.join(', ')}`);
+      console.log(`   Status: ${bug.status}`);
+      console.log(`   Assignee: ${bug.assignee}`);
       console.log('');
     });
-    console.log(`Total unique errors processed: ${processedErrors.length}\n`);
+    console.log(`Total unique bugs processed: ${processedBugs.length}\n`);
 
     // Step 2: Get existing data from Redis
     const existingData = await getRepositoryData(owner, repo);
 
     // Step 3: Merge new bugs with existing ones
-    const mergedBugs = mergeBugs(existingData.bugs, processedErrors);
+    const mergedBugs = mergeBugs(existingData.bugs, processedBugs);
     
     // Log merge results
     console.log(`=== MERGE RESULTS ===`);
     console.log(`Existing bugs in DB: ${existingData.bugs.length}`);
-    console.log(`New unique errors: ${processedErrors.length}`);
+    console.log(`New unique bugs: ${processedBugs.length}`);
     console.log(`Total after merge: ${mergedBugs.length}`);
     console.log('');
 
@@ -449,29 +537,28 @@ export async function POST(request: NextRequest) {
     await saveRepositoryData(owner, repo, updatedData);
 
     // Step 5: Prepare response with insights
+    const criticalBugs = mergedBugs.filter(b => b.severity === 'critical');
     const highPriorityBugs = mergedBugs.filter(b => b.severity === 'high');
     const mediumPriorityBugs = mergedBugs.filter(b => b.severity === 'medium');
     const lowPriorityBugs = mergedBugs.filter(b => b.severity === 'low');
 
     const insights = [
-      `Processed ${errorCollection.errors.length} errors into ${processedErrors.length} unique issues`,
+      `Processed ${errorCollection.errors.length} errors into ${processedBugs.length} unique bugs`,
       `Total bugs in repository: ${mergedBugs.length}`,
-      `Priority breakdown: ${highPriorityBugs.length} high, ${mediumPriorityBugs.length} medium, ${lowPriorityBugs.length} low`
+      `Severity breakdown: ${criticalBugs.length} critical, ${highPriorityBugs.length} high, ${mediumPriorityBugs.length} medium, ${lowPriorityBugs.length} low`
     ];
 
     const suggestions = [];
     
+    if (criticalBugs.length > 0) {
+      suggestions.push(`🚨 Address ${criticalBugs.length} critical issues immediately`);
+    }
+    
     if (highPriorityBugs.length > 0) {
       suggestions.push(`❗ Address ${highPriorityBugs.length} high-priority issues first`);
-      // Add specific suggestions from high-priority bugs
-      highPriorityBugs.slice(0, 3).forEach(bug => {
-        if (bug.suggestedFix) {
-          suggestions.push(`🔧 ${bug.suggestedFix}`);
-        }
-      });
     }
 
-    if (processedErrors.length > 5) {
+    if (processedBugs.length > 5) {
       suggestions.push('Consider setting up automated linting and pre-commit hooks');
     }
 
@@ -479,10 +566,11 @@ export async function POST(request: NextRequest) {
       success: true,
       processed: {
         original: errorCollection.errors.length,
-        unique: processedErrors.length,
+        unique: processedBugs.length,
         total: mergedBugs.length
       },
       priority: {
+        critical: criticalBugs.length,
         high: highPriorityBugs.length,
         medium: mediumPriorityBugs.length,
         low: lowPriorityBugs.length
@@ -494,16 +582,17 @@ export async function POST(request: NextRequest) {
         repo,
         lastUpdated: new Date().toISOString()
       },
-      // Add the detailed unique errors to the response
-      uniqueErrors: processedErrors.map(error => ({
-        id: error.id,
-        severity: error.severity,
-        taskName: error.taskName,
-        message: error.message,
-        category: error.category,
-        location: error.location,
-        occurrences: error.occurrences,
-        suggestedFix: error.suggestedFix
+      // Add the detailed unique bugs to the response
+      uniqueBugs: processedBugs.map(bug => ({
+        id: bug.id,
+        title: bug.title,
+        description: bug.description,
+        severity: bug.severity,
+        status: bug.status,
+        assignee: bug.assignee,
+        labels: bug.labels,
+        createdAt: bug.createdAt,
+        updatedAt: bug.updatedAt
       }))
     });
 

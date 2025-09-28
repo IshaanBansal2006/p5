@@ -30,12 +30,14 @@ interface Bug {
   id: string;
   title: string;
   description: string;
-  status: string;
-  priority: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  status: 'open' | 'in-progress' | 'resolved' | 'closed';
   assignee: string;
+  reporter: string;
   createdAt: string;
   updatedAt: string;
   labels: string[];
+  checked: boolean;
 }
 
 interface RepositoryData {
