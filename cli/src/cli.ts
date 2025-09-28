@@ -3,6 +3,7 @@ import { hideBin } from 'yargs/helpers';
 import { cmdDevpostGen } from './commands/devpostGen.js';
 import { cmdReadmeSync } from './commands/readmeSync.js';
 import { cmdInit } from './commands/init.js';
+import { cmdTest } from './commands/test.js';
 
 export async function runCLI(): Promise<void> {
   await yargs(hideBin(process.argv))
@@ -20,6 +21,27 @@ export async function runCLI(): Promise<void> {
       },
       async (args) => {
         await cmdInit(args);
+      }
+    )
+    .command(
+      'test [stage]',
+      'Run project tests',
+      (yargs) => {
+        return yargs
+          .positional('stage', {
+            describe: 'Test stage to run',
+            type: 'string',
+            choices: ['pre-commit', 'pre-push', 'ci']
+          })
+          .option('all', {
+            alias: 'a',
+            describe: 'Run all available tests',
+            type: 'boolean',
+            default: false
+          });
+      },
+      async (args) => {
+        await cmdTest(args);
       }
     )
     .command(

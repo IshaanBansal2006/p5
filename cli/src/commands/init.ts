@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
-import { mkdir } from 'fs/promises';
+
 import { join } from 'path';
 import prompts from 'prompts';
 import chalk from 'chalk';
@@ -8,7 +8,6 @@ import { execSync } from 'child_process';
 import { getDefaultConfig, saveConfig } from '../core/config.js';
 import { isGitRepository, initGitRepository } from '../core/git.js';
 import { createGitHubWorkflow, createHuskyHooks, ensureHuskyInstalled, installHusky } from '../core/ci.js';
-import { createPlaywrightConfig, createSmokeTest } from '../core/playwright.js';
 import { syncReadme } from '../core/readme.js';
 
 // Auto-detect GitHub repository info
@@ -194,19 +193,6 @@ export async function cmdInit(args: InitArgs = {}): Promise<void> {
     spinner.text = 'Creating GitHub workflow...';
     createGitHubWorkflow(projectRoot);
     
-    // Set up Playwright (config only - skip installation)
-    spinner.text = 'Setting up Playwright...';
-    
-    // Ensure the test directory exists first
-    const testDir = join(projectRoot, 'tests', 'e2e');
-    await mkdir(testDir, { recursive: true });
-    
-    createPlaywrightConfig(projectRoot);
-    createSmokeTest(projectRoot);
-    
-    // Skip Playwright installation during init - let user install later
-    console.log(chalk.yellow('⚠️  Playwright setup complete. Run "npx playwright install" when ready to install browsers.'));
-    
     // Add npm scripts to package.json
     spinner.text = 'Adding npm scripts...';
     await addNpmScripts(projectRoot);
@@ -235,11 +221,10 @@ export async function cmdInit(args: InitArgs = {}): Promise<void> {
     if (responses.demoUrl) console.log(`  🌐 Demo: ${responses.demoUrl}`);
     
     console.log(chalk.blue('\nNext steps:'));
-    console.log('  npx playwright install   # Install browser binaries');
+    console.log('  npm install puppeteer-core --save-dev  # For website testing');
     console.log('  npx p5 test              # Run tests');
     console.log('  npx p5 readme sync       # Update README');
     console.log('  npx p5 devpost gen       # Generate Devpost');
-    console.log('  npx p5 pw:record         # Record Playwright tests');
     
   } catch (error) {
     spinner.fail('Failed to initialize project');
