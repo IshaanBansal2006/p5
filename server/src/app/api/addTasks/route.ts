@@ -70,23 +70,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate task structure
+    // Validate task structure - only title is mandatory
     for (const task of tasks) {
-      if (!task.title || !task.description || !task.priority || !task.status || !task.assignee || !task.reporter) {
+      if (!task.title || task.title.trim() === '') {
         return NextResponse.json(
-          { error: 'Each task must have title, description, priority, status, assignee, and reporter' },
+          { error: 'Each task must have a title' },
           { status: 400 }
         );
       }
 
-      if (!['low', 'medium', 'high', 'critical'].includes(task.priority)) {
+      // Validate priority if provided, otherwise it will get a default value
+      if (task.priority && !['low', 'medium', 'high', 'critical'].includes(task.priority)) {
         return NextResponse.json(
           { error: 'Priority must be one of: low, medium, high, critical' },
           { status: 400 }
         );
       }
 
-      if (!['todo', 'in-progress', 'completed', 'cancelled'].includes(task.status)) {
+      // Validate status if provided, otherwise it will get a default value
+      if (task.status && !['todo', 'in-progress', 'completed', 'cancelled'].includes(task.status)) {
         return NextResponse.json(
           { error: 'Status must be one of: todo, in-progress, completed, cancelled' },
           { status: 400 }
@@ -110,22 +112,22 @@ export async function POST(request: NextRequest) {
       };
     }
 
-    // Process and add new tasks
+    // Process and add new tasks with default values
     const currentTime = new Date().toISOString();
     const newTasks: Task[] = tasks.map(task => ({
       id: generateTaskId(),
-      title: task.title,
-      description: task.description,
-      priority: task.priority,
-      status: task.status,
-      assignee: task.assignee,
-      reporter: task.reporter,
-      dueDate: task.dueDate,
+      title: task.title.trim(),
+      description: task.description || 'No description provided',
+      priority: task.priority || 'medium',
+      status: task.status || 'todo',
+      assignee: task.assignee || 'unassigned',
+      reporter: task.reporter || 'system',
+      dueDate: task.dueDate || '',
       createdAt: currentTime,
       updatedAt: currentTime,
       tags: task.tags || [],
       comments: [],
-      completed: task.status === 'completed',
+      completed: (task.status || 'todo') === 'completed',
       checked: false
     }));
 
