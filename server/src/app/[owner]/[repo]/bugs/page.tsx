@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Bug, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Clock, Zap, Filter, TriangleAlert as AlertTriangle, Plus, Loader2, Edit2, Save, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
@@ -35,6 +36,7 @@ const RepoBugs = () => {
   const [filterPriority, setFilterPriority] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterAssignee, setFilterAssignee] = useState("all");
+  const [hideResolved, setHideResolved] = useState(false);
   const [sortBy, setSortBy] = useState("newest");
   const [bugs, setBugs] = useState<Bug[]>([]);
   const [loading, setLoading] = useState(true);
@@ -267,6 +269,7 @@ const RepoBugs = () => {
     if (filterPriority !== "all" && bug.severity !== filterPriority) return false;
     if (filterStatus !== "all" && bug.status !== filterStatus) return false;
     if (filterAssignee !== "all" && bug.assignee !== filterAssignee) return false;
+    if (hideResolved && (bug.status === "resolved" || bug.status === "closed")) return false;
     return true;
   }).sort((a, b) => {
     if (sortBy === "newest") return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -408,6 +411,19 @@ const RepoBugs = () => {
                           </SelectContent>
                         </Select>
                       </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="hideResolved" 
+                          checked={hideResolved}
+                          onCheckedChange={(checked) => setHideResolved(checked as boolean)}
+                        />
+                        <label
+                          htmlFor="hideResolved"
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          Hide resolved bugs
+                        </label>
+                      </div>
                       <div className="flex gap-2">
                         <Button 
                           variant="outline" 
@@ -415,6 +431,7 @@ const RepoBugs = () => {
                             setFilterPriority("all");
                             setFilterStatus("all");
                             setFilterAssignee("all");
+                            setHideResolved(false);
                             setSortBy("newest");
                           }}
                         >
@@ -516,7 +533,9 @@ const RepoBugs = () => {
 
             <div className="space-y-4">
               {filteredBugs.map((bug, index) => (
-                <div key={index} className="p-4 rounded-lg bg-background/20 border border-border/20 hover:border-primary/20 transition-smooth">
+                <div key={index} className={`p-4 rounded-lg bg-background/20 border border-border/20 hover:border-primary/20 transition-smooth ${
+                  bug.status === "resolved" || bug.status === "closed" ? "opacity-60" : ""
+                }`}>
                   {editingBug === bug.id ? (
                     // Edit Mode
                     <div className="space-y-4">
@@ -628,7 +647,9 @@ const RepoBugs = () => {
                           </div>
                           <span className="text-sm font-mono text-muted-foreground">{bug.id}</span>
                           <div className={`w-3 h-3 rounded-full ${getSeverityColor(bug.severity)} mt-1`}></div>
-                          <h4 className="font-medium">{bug.title}</h4>
+                          <h4 className={`font-medium ${bug.status === "resolved" || bug.status === "closed" ? "line-through" : ""}`}>
+                            {bug.title}
+                          </h4>
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className={getStatusColor(bug.status)}>
@@ -645,13 +666,13 @@ const RepoBugs = () => {
                       </div>
 
                       {bug.description && bug.description.trim() !== ' ' && (
-                        <div className="mb-3 text-sm text-muted-foreground">
+                        <div className={`mb-3 text-sm text-muted-foreground ${bug.status === "resolved" || bug.status === "closed" ? "line-through" : ""}`}>
                           {bug.description}
                         </div>
                       )}
 
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className={`flex items-center gap-4 text-sm text-muted-foreground ${bug.status === "resolved" || bug.status === "closed" ? "line-through" : ""}`}>
                           <span>Reported by {bug.reporter}</span>
                           <span>•</span>
                           <span>Assigned to {bug.assignee}</span>
@@ -660,7 +681,7 @@ const RepoBugs = () => {
                         </div>
                         <div className="flex gap-1">
                           {bug.labels.map((label, labelIndex) => (
-                            <Badge key={labelIndex} variant="secondary" className="text-xs">
+                            <Badge key={labelIndex} variant="secondary" className={`text-xs ${bug.status === "resolved" || bug.status === "closed" ? "opacity-60" : ""}`}>
                               {label}
                             </Badge>
                           ))}

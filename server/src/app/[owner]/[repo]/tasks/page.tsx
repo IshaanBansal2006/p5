@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { SquareCheck as CheckSquare, Square, Clock, Plus, Zap, Filter, Loader2, Edit2, Save, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
@@ -45,6 +46,7 @@ const Tasks = () => {
   const [filterPriority, setFilterPriority] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterAssignee, setFilterAssignee] = useState("all");
+  const [hideCompleted, setHideCompleted] = useState(false);
   const [sortBy, setSortBy] = useState("newest");
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -287,6 +289,7 @@ const Tasks = () => {
     if (filterPriority !== "all" && task.priority !== filterPriority) return false;
     if (filterStatus !== "all" && task.status !== filterStatus) return false;
     if (filterAssignee !== "all" && task.assignee !== filterAssignee) return false;
+    if (hideCompleted && task.status === "completed") return false;
     return true;
   }).sort((a, b) => {
     if (sortBy === "newest") return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -428,6 +431,19 @@ const Tasks = () => {
                           </SelectContent>
                         </Select>
                       </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="hideCompleted" 
+                          checked={hideCompleted}
+                          onCheckedChange={(checked) => setHideCompleted(checked as boolean)}
+                        />
+                        <label
+                          htmlFor="hideCompleted"
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          Hide completed tasks
+                        </label>
+                      </div>
                       <div className="flex gap-2">
                         <Button 
                           variant="outline" 
@@ -435,6 +451,7 @@ const Tasks = () => {
                             setFilterPriority("all");
                             setFilterStatus("all");
                             setFilterAssignee("all");
+                            setHideCompleted(false);
                             setSortBy("newest");
                           }}
                         >
@@ -536,7 +553,9 @@ const Tasks = () => {
 
             <div className="space-y-4">
               {filteredTasks.map((task, index) => (
-                <div key={index} className="p-4 rounded-lg bg-background/20 border border-border/20 hover:border-primary/20 transition-smooth">
+                <div key={index} className={`p-4 rounded-lg bg-background/20 border border-border/20 hover:border-primary/20 transition-smooth ${
+                  task.status === "completed" ? "opacity-60" : ""
+                }`}>
                   {editingTask === task.id ? (
                     // Edit Mode
                     <div className="space-y-4">
@@ -669,7 +688,9 @@ const Tasks = () => {
                             task.priority === 'high' ? 'bg-orange-500' :
                             task.priority === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
                           } mt-1`}></div>
-                          <h4 className="font-medium">{task.title}</h4>
+                          <h4 className={`font-medium ${task.status === "completed" ? "line-through" : ""}`}>
+                            {task.title}
+                          </h4>
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className={
@@ -691,13 +712,13 @@ const Tasks = () => {
                       </div>
 
                       {task.description && (
-                        <div className="mb-3 text-sm text-muted-foreground">
+                        <div className={`mb-3 text-sm text-muted-foreground ${task.status === "completed" ? "line-through" : ""}`}>
                           {task.description}
                         </div>
                       )}
 
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className={`flex items-center gap-4 text-sm text-muted-foreground ${task.status === "completed" ? "line-through" : ""}`}>
                           <span>Assigned to {task.assignee}</span>
                           <span>•</span>
                           <span>Reporter: {task.reporter}</span>
@@ -712,7 +733,7 @@ const Tasks = () => {
                         </div>
                         <div className="flex gap-1">
                           {task.tags.map((tag, tagIndex) => (
-                            <Badge key={tagIndex} variant="secondary" className="text-xs">
+                            <Badge key={tagIndex} variant="secondary" className={`text-xs ${task.status === "completed" ? "opacity-60" : ""}`}>
                               {tag}
                             </Badge>
                           ))}
