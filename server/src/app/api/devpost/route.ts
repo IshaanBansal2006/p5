@@ -174,6 +174,8 @@ async function fetchTechStack(owner: string, repo: string) {
 
 // Function to analyze repository structure and get additional context
 async function getRepoInsights(owner: string, repo: string) {
+  console.log('🤖 ABOUT TO CALL GEMINI API');
+  console.log('🔑 GEMINI_API_KEY exists:', !!process.env.GEMINI_API_KEY);
   try {
     // Get languages breakdown
     const languagesResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/languages`, {
@@ -287,7 +289,18 @@ Return ONLY a JSON object with these exact keys: inspiration, what_it_does, how_
 
   // Gemini API call
   try {
-    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+    const listResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${process.env.GEMINI_API_KEY}`);
+    if (listResponse.ok) {
+      const models = await listResponse.json();
+      console.log('Available models:', models.models.map(m => m.name));
+    } else {
+      console.log('Could not list models:', await listResponse.text());
+    }
+  } catch (e) {
+    console.log('Error listing models:', e);
+  }
+  try {
+    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -303,12 +316,16 @@ Return ONLY a JSON object with these exact keys: inspiration, what_it_does, how_
           topK: 40,
           topP: 0.95,
           maxOutputTokens: 8192,
-          responseMimeType: "application/json"
+          
         }
       })
     });
 
     if (!geminiResponse.ok) {
+      const errorBody = await geminiResponse.text();
+  console.log('Gemini error response:', errorBody);
+  console.log('Request URL:', `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY?.substring(0, 10)}...`);
+  throw new Error(`Gemini API error: ${geminiResponse.status} ${geminiResponse.statusText} - ${errorBody}`);
       throw new Error(`Gemini API error: ${geminiResponse.status} ${geminiResponse.statusText}`);
     }
 
@@ -321,7 +338,9 @@ Return ONLY a JSON object with these exact keys: inspiration, what_it_does, how_
     const generatedContent = geminiData.candidates[0].content.parts[0].text;
     
     try {
-      return JSON.parse(generatedContent);
+      // Remove markdown code fences if present
+      const cleanedContent = generatedContent.replace(/^```json\s*\n?/, '').replace(/\n?```\s*$/, '');
+      return JSON.parse(cleanedContent);
     } catch (parseError) {
       console.error('Error parsing Gemini response as JSON:', parseError);
       console.error('Raw response:', generatedContent);
