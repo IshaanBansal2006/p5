@@ -16,7 +16,6 @@ interface Task {
   priority: 'low' | 'medium' | 'high' | 'critical';
   status: 'todo' | 'in-progress' | 'completed' | 'cancelled';
   assignee: string;
-  reporter: string;
   dueDate: string;
   createdAt: string;
   updatedAt: string;
@@ -34,7 +33,6 @@ interface RepositoryData {
     severity: 'low' | 'medium' | 'high' | 'critical';
     status: 'open' | 'in-progress' | 'resolved' | 'closed';
     assignee: string;
-    reporter: string;
     createdAt: string;
     updatedAt: string;
     labels: string[];

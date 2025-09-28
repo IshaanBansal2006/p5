@@ -30,7 +30,6 @@ interface Task {
   priority: 'low' | 'medium' | 'high' | 'critical';
   status: 'todo' | 'in-progress' | 'completed' | 'cancelled';
   assignee: string;
-  reporter: string;
   dueDate: string;
   createdAt: string;
   updatedAt: string;
@@ -61,7 +60,6 @@ const Tasks = () => {
     description: "",
     priority: "medium",
     assignee: "",
-    reporter: "",
     dueDate: "",
     comments: ""
   });
@@ -194,7 +192,6 @@ const Tasks = () => {
             priority: newTaskData.priority,
             status: "todo",
             assignee: newTaskData.assignee || "unassigned",
-            reporter: newTaskData.reporter || "system",
             dueDate: newTaskData.dueDate,
             tags: newTaskData.comments ? newTaskData.comments.split(',').map(t => t.trim()) : []
           }]
@@ -217,7 +214,6 @@ const Tasks = () => {
         description: "",
         priority: "medium",
         assignee: "",
-        reporter: "",
         dueDate: "",
         comments: ""
       });
@@ -236,7 +232,6 @@ const Tasks = () => {
       priority: task.priority,
       status: task.status,
       assignee: task.assignee,
-      reporter: task.reporter,
       dueDate: task.dueDate,
       tags: task.tags
     });
@@ -525,16 +520,6 @@ const Tasks = () => {
                         </div>
                       </div>
                       <div>
-                        <ContributorSelect
-                          value={newTaskData.reporter}
-                          onChange={(value) => setNewTaskData(prev => ({ ...prev, reporter: value }))}
-                          placeholder="Select or type reporter"
-                          label="Reporter (Optional)"
-                          owner={owner as string}
-                          repo={repo as string}
-                        />
-                      </div>
-                      <div>
                         <Label htmlFor="dueDate">Due Date (Optional)</Label>
                       <Input
                         id="dueDate"
@@ -641,15 +626,6 @@ const Tasks = () => {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <Label htmlFor={`edit-reporter-${task.id}`}>Reporter</Label>
-                        <Input
-                          id={`edit-reporter-${task.id}`}
-                          value={editTaskData.reporter || ''}
-                          onChange={(e) => setEditTaskData(prev => ({ ...prev, reporter: e.target.value }))}
-                          placeholder="Enter reporter"
-                        />
-                      </div>
-                      <div>
                         <Label htmlFor={`edit-dueDate-${task.id}`}>Due Date</Label>
                         <Input
                           id={`edit-dueDate-${task.id}`}
@@ -740,15 +716,6 @@ const Tasks = () => {
                             repo={repo as string}
                           />
                         </div>
-                        <span>•</span>
-                          <div className="flex items-center gap-2">
-                            <span>Reporter:</span>
-                            <ContributorDisplay
-                              assignee={task.reporter}
-                              owner={owner as string}
-                              repo={repo as string}
-                            />
-                          </div>
                         <span>•</span>
                         <span>{new Date(task.createdAt).toLocaleDateString()}</span>
                         {task.dueDate && (

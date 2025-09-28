@@ -10,7 +10,6 @@ interface Task {
   priority: 'low' | 'medium' | 'high' | 'critical';
   status: 'todo' | 'in-progress' | 'completed' | 'cancelled';
   assignee: string;
-  reporter: string;
   dueDate: string;
   createdAt: string;
   updatedAt: string;
@@ -34,7 +33,6 @@ interface Bug {
   status: string;
   priority: string;
   assignee: string;
-  reporter: string;
   createdAt: string;
   updatedAt: string;
   labels: string[];
@@ -121,7 +119,6 @@ export async function POST(request: NextRequest) {
       priority: task.priority || 'medium',
       status: task.status || 'todo',
       assignee: task.assignee || 'unassigned',
-      reporter: task.reporter || 'system',
       dueDate: task.dueDate || '',
       createdAt: currentTime,
       updatedAt: currentTime,
