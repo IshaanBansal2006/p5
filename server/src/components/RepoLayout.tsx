@@ -17,12 +17,30 @@ interface RepoData {
   description: string | null;
 }
 
+interface SuggestionData {
+  id: string;
+  title: string;
+  type: 'bug' | 'task';
+  priority: string;
+  assignee: string;
+  description: string;
+}
+
+interface SuggestionResponse {
+  suggestion: SuggestionData | null;
+  message: string;
+  type?: string;
+}
+
 const RepoLayout = ({ children }: RepoLayoutProps) => {
   const params = useParams();
   const pathname = usePathname();
   const { owner, repo } = params;
   const [repoData, setRepoData] = useState<RepoData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [suggestionData, setSuggestionData] = useState<SuggestionData | null>(null);
+  const [suggestionMessage, setSuggestionMessage] = useState<string>('');
+  const [isSuggestionLoading, setIsSuggestionLoading] = useState(true);
 
   useEffect(() => {
     const fetchRepoData = async () => {
@@ -40,8 +58,25 @@ const RepoLayout = ({ children }: RepoLayoutProps) => {
       }
     };
 
+    const fetchSuggestion = async () => {
+      try {
+        setIsSuggestionLoading(true);
+        const response = await fetch(`/api/next-suggestion?owner=${owner}&repo=${repo}`);
+        if (response.ok) {
+          const data: SuggestionResponse = await response.json();
+          setSuggestionData(data.suggestion);
+          setSuggestionMessage(data.message);
+        }
+      } catch (error) {
+        console.error('Failed to fetch suggestion:', error);
+      } finally {
+        setIsSuggestionLoading(false);
+      }
+    };
+
     if (owner && repo) {
       fetchRepoData();
+      fetchSuggestion();
     }
   }, [owner, repo]);
 
@@ -106,6 +141,60 @@ const RepoLayout = ({ children }: RepoLayoutProps) => {
                     P5 Enabled
                   </Badge>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Suggestion Box */}
+      <div className="bg-background/50 backdrop-blur-sm border-b border-border/40">
+        <div className="container mx-auto px-6 py-4">
+          <div className="bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
+                <span className="text-sm font-bold text-primary">💡</span>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-foreground mb-1">
+                  {isSuggestionLoading ? 'Loading suggestion...' : 'Next Suggested Work'}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {isSuggestionLoading ? 'Finding the next priority item...' : suggestionMessage}
+                </p>
+                {suggestionData && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <Badge 
+                      variant="outline" 
+                      className={`text-xs ${
+                        suggestionData.type === 'bug' 
+                          ? 'border-red-500/20 text-red-500 bg-red-500/10' 
+                          : 'border-blue-500/20 text-blue-500 bg-blue-500/10'
+                      }`}
+                    >
+                      {suggestionData.type === 'bug' ? '🐛 Bug' : '📋 Task'} #{suggestionData.id}
+                    </Badge>
+                    <Badge 
+                      variant="outline" 
+                      className={`text-xs ${
+                        suggestionData.priority === 'critical' 
+                          ? 'border-red-500/20 text-red-500 bg-red-500/10'
+                          : suggestionData.priority === 'high'
+                          ? 'border-orange-500/20 text-orange-500 bg-orange-500/10'
+                          : suggestionData.priority === 'medium'
+                          ? 'border-yellow-500/20 text-yellow-500 bg-yellow-500/10'
+                          : 'border-gray-500/20 text-gray-500 bg-gray-500/10'
+                      }`}
+                    >
+                      {suggestionData.priority}
+                    </Badge>
+                    {suggestionData.assignee !== 'unassigned' && (
+                      <span className="text-xs text-muted-foreground">
+                        Assigned to: {suggestionData.assignee}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
