@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Bug, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Clock, Zap, Filter, TriangleAlert as AlertTriangle, Plus, Loader2, Edit2, Save, X } from "lucide-react";
+import { Bug, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Clock, Zap, Filter, TriangleAlert as AlertTriangle, Plus, Loader2, Edit2, Save, X, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import RepoLayout from "@/components/RepoLayout";
@@ -45,6 +45,8 @@ const RepoBugs = () => {
   const [error, setError] = useState<string | null>(null);
   const [editingBug, setEditingBug] = useState<string | null>(null);
   const [editBugData, setEditBugData] = useState<Partial<Bug>>({});
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [bugToDelete, setBugToDelete] = useState<string | null>(null);
 
   const [newBugData, setNewBugData] = useState({
     title: "",
@@ -238,6 +240,47 @@ const RepoBugs = () => {
   const handleCancelEdit = () => {
     setEditingBug(null);
     setEditBugData({});
+  };
+
+  const handleDeleteBug = (bugId: string) => {
+    setBugToDelete(bugId);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteBug = async () => {
+    if (!bugToDelete) return;
+
+    try {
+      const response = await fetch('/api/deleteBug', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          owner,
+          repo,
+          bugId: bugToDelete
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete bug');
+      }
+
+      // Remove the bug from local state
+      setBugs(prevBugs => prevBugs.filter(bug => bug.id !== bugToDelete));
+      
+      setShowDeleteConfirm(false);
+      setBugToDelete(null);
+    } catch (error) {
+      console.error('Error deleting bug:', error);
+      setError('Failed to delete bug');
+    }
+  };
+
+  const cancelDeleteBug = () => {
+    setShowDeleteConfirm(false);
+    setBugToDelete(null);
   };
 
   const handleBugCheck = async (bugId: string) => {
@@ -664,15 +707,25 @@ const RepoBugs = () => {
                           placeholder="e.g., frontend, api, critical"
                         />
                       </div>
-                      <div className="flex gap-2 justify-end">
-                        <Button variant="outline" onClick={handleCancelEdit}>
-                          <X className="w-4 h-4 mr-2" />
-                          Cancel
+                      <div className="flex gap-2 justify-between">
+                        <Button 
+                          variant="destructive" 
+                          onClick={() => handleDeleteBug(bug.id)}
+                          className="flex items-center gap-2"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Delete Bug
                         </Button>
-                        <Button onClick={handleSaveEdit}>
-                          <Save className="w-4 h-4 mr-2" />
-                          Save
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button variant="outline" onClick={handleCancelEdit}>
+                            <X className="w-4 h-4 mr-2" />
+                            Cancel
+                          </Button>
+                          <Button onClick={handleSaveEdit}>
+                            <Save className="w-4 h-4 mr-2" />
+                            Save
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -787,6 +840,32 @@ const RepoBugs = () => {
             </div>
           </Card>
         </div>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-destructive">
+                <Trash2 className="w-5 h-5" />
+                Delete Bug
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Are you sure you want to delete this bug? This action is permanent and cannot be undone.
+              </p>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={cancelDeleteBug}>
+                  Cancel
+                </Button>
+                <Button variant="destructive" onClick={confirmDeleteBug}>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Permanently
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
     </RepoLayout>
   );
 };

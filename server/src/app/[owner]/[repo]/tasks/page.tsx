@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { SquareCheck as CheckSquare, Square, Clock, Plus, Zap, Filter, Loader2, Edit2, Save, X } from "lucide-react";
+import { SquareCheck as CheckSquare, Square, Clock, Plus, Zap, Filter, Loader2, Edit2, Save, X, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import RepoLayout from "@/components/RepoLayout";
@@ -54,6 +54,8 @@ const Tasks = () => {
   const [error, setError] = useState<string | null>(null);
   const [editingTask, setEditingTask] = useState<string | null>(null);
   const [editTaskData, setEditTaskData] = useState<Partial<Task>>({});
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
 
   const [newTaskData, setNewTaskData] = useState({
     title: "",
@@ -282,6 +284,47 @@ const Tasks = () => {
   const handleCancelEdit = () => {
     setEditingTask(null);
     setEditTaskData({});
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+    setTaskToDelete(taskId);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteTask = async () => {
+    if (!taskToDelete) return;
+
+    try {
+      const response = await fetch('/api/deleteTask', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          owner,
+          repo,
+          taskId: taskToDelete
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete task');
+      }
+
+      // Remove the task from local state
+      setTasks(prevTasks => prevTasks.filter(task => task.id !== taskToDelete));
+      
+      setShowDeleteConfirm(false);
+      setTaskToDelete(null);
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      setError('Failed to delete task');
+    }
+  };
+
+  const cancelDeleteTask = () => {
+    setShowDeleteConfirm(false);
+    setTaskToDelete(null);
   };
 
   const filteredTasks = tasks.filter(task => {
@@ -644,16 +687,26 @@ const Tasks = () => {
                         placeholder="e.g., frontend, api, critical"
                       />
                     </div>
-                    <div className="flex gap-2 justify-end">
-                      <Button variant="outline" onClick={handleCancelEdit}>
-                        <X className="w-4 h-4 mr-2" />
-                        Cancel
-                      </Button>
-                      <Button onClick={handleSaveEdit}>
-                        <Save className="w-4 h-4 mr-2" />
-                        Save
-                      </Button>
-                    </div>
+                     <div className="flex gap-2 justify-between">
+                       <Button 
+                         variant="destructive" 
+                         onClick={() => handleDeleteTask(task.id)}
+                         className="flex items-center gap-2"
+                       >
+                         <Trash2 className="w-4 h-4" />
+                         Delete Task
+                       </Button>
+                       <div className="flex gap-2">
+                         <Button variant="outline" onClick={handleCancelEdit}>
+                           <X className="w-4 h-4 mr-2" />
+                           Cancel
+                         </Button>
+                         <Button onClick={handleSaveEdit}>
+                           <Save className="w-4 h-4 mr-2" />
+                           Save
+                         </Button>
+                       </div>
+                     </div>
                   </div>
                 ) : (
                   // View Mode
@@ -776,8 +829,34 @@ const Tasks = () => {
                 </div>
               </div>
             </div>
-        </Card>
-      </div>
+          </Card>
+        </div>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-destructive">
+                <Trash2 className="w-5 h-5" />
+                Delete Task
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Are you sure you want to delete this task? This action is permanent and cannot be undone.
+              </p>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={cancelDeleteTask}>
+                  Cancel
+                </Button>
+                <Button variant="destructive" onClick={confirmDeleteTask}>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Permanently
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
     </RepoLayout>
   );
 };
