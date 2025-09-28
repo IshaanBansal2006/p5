@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Terminal, Zap, Shield, FileText, Eye, Github } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 
 const Home = () => {
   const features = [
@@ -48,16 +49,16 @@ const Home = () => {
                 <Github className="w-4 h-4" />
                 GitHub
               </Button>
-              <a href="/documentation">
+              <Link href="/documentation">
                 <Button variant="outline" size="sm">
                   Documentation
                 </Button>
-              </a>
-              <a href="/documentation#get-started">
+              </Link>
+              <Link href="/documentation#get-started">
                 <Button variant="default" size="sm">
                   Get Started
                 </Button>
-              </a>
+              </Link>
             </div>
           </div>
         </div>
@@ -84,21 +85,21 @@ const Home = () => {
               devpost generation, and more. Focus on building, not the boring stuff.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a href="/documentation#get-started">
+              <Link href="/documentation#get-started">
                 <Button variant="hero" size="lg" className="text-lg px-8 py-4">
                   <Terminal className="w-5 h-5" />
                   Get Started
                 </Button>
-              </a>
+              </Link>
               <Button variant="outline" size="lg" className="text-lg px-8 py-4">
                 <Terminal className="w-5 h-5" />
                 npm install -g p5
               </Button>
-              <a href="/documentation">
+              <Link href="/documentation">
                 <Button variant="outline" size="lg" className="text-lg px-8 py-4">
                   View Documentation
                 </Button>
-              </a>
+              </Link>
             </div>
           </div>
         </div>

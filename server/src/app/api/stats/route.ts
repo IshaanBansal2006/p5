@@ -1,20 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from 'redis';
 import { Octokit } from '@octokit/rest';
+import { redis } from '@/lib/redis';
 
-// Redis client configuration
-const redis = createClient({
-  username: 'default',
-  password: process.env.REDIS_PASSWORD,
-  socket: {
-    host: process.env.REDIS_HOST,
-    port: parseInt(process.env.REDIS_PORT || '6379')
-  }
-});
-
-// Connect to Redis
-redis.on('error', (err) => console.log('Redis Client Error', err));
-await redis.connect();
 
 // GitHub API client
 const octokit = new Octokit({
@@ -144,25 +131,16 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch repository data from GitHub
-    const [repoData, commits, branches, contributors] = await Promise.all([
+    const [, commits, branches, contributors] = await Promise.all([
       octokit.rest.repos.get({ owner, repo }),
       octokit.rest.repos.listCommits({ owner, repo, per_page: 100 }),
       octokit.rest.repos.listBranches({ owner, repo, per_page: 100 }),
       octokit.rest.repos.listContributors({ owner, repo, per_page: 100 })
     ]);
 
-    // Process commit history for changelog (commits are already in reverse chronological order from GitHub API)
-    const commitHistory = commits.data.map(commit => ({
-      sha: commit.sha,
-      author: commit.commit.author?.name || commit.author?.login || 'Unknown',
-      date: commit.commit.author?.date || new Date().toISOString(),
-      message: commit.commit.message,
-      additions: 0, // Will be populated from commit details
-      deletions: 0,
-      changes: 0
-    }));
 
-    // Get detailed commit stats for first 50 commits (mimicking debug endpoint)
+    // Get detailed commit stats
+    const commitsToAnalyze = 20; // Configurable number of commits to analyze
     const detailedCommits: CommitData[] = [];
     for (const commit of commits.data.slice(0, 50)) {
       try {
@@ -208,13 +186,11 @@ export async function GET(request: NextRequest) {
 
     // Process time series data - total lines of code over commits in chronological order
     const timeSeriesData: TimeSeriesData[] = [];
-    let cumulativeLines = 0;
     
     // Sort commits by date (oldest first) for cumulative calculation - create a copy to avoid mutating original
     const sortedCommits = [...detailedCommits].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     
     for (const commit of sortedCommits) {
-      cumulativeLines += commit.additions - commit.deletions;
       timeSeriesData.push({
         date: commit.date,
         commits: 1,

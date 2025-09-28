@@ -1,19 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from 'redis';
+import { redis } from '@/lib/redis';
 
-// Redis client configuration
-const redis = createClient({
-  username: 'default',
-  password: process.env.REDIS_PASSWORD,
-  socket: {
-    host: process.env.REDIS_HOST,
-    port: parseInt(process.env.REDIS_PORT || '6379')
-  }
-});
-
-// Connect to Redis
-redis.on('error', (err) => console.log('Redis Client Error', err));
-await redis.connect();
 
 // Task interface definition
 interface Task {
@@ -40,8 +27,21 @@ interface TaskComment {
   createdAt: string;
 }
 
+interface Bug {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  priority: string;
+  assignee: string;
+  reporter: string;
+  createdAt: string;
+  updatedAt: string;
+  labels: string[];
+}
+
 interface RepositoryData {
-  bugs: any[];
+  bugs: Bug[];
   tasks: Task[];
 }
 
@@ -56,10 +56,6 @@ function generateTaskId(): string {
   return `T-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
 }
 
-// Generate unique comment ID
-function generateCommentId(): string {
-  return `C-${Math.floor(Math.random() * 100000).toString().padStart(5, '0')}`;
-}
 
 export async function POST(request: NextRequest) {
   try {

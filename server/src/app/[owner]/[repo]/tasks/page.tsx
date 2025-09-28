@@ -7,13 +7,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { SquareCheck as CheckSquare, Square, Clock, User, Plus, Zap, Filter, Calendar, MessageSquare, Loader2 } from "lucide-react";
+import { SquareCheck as CheckSquare, Square, Clock, User, Plus, Zap, Filter, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
 import RepoLayout from "@/components/RepoLayout";
 
 // Task interface definition
+interface TaskComment {
+  id: string;
+  author: string;
+  content: string;
+  createdAt: string;
+}
+
 interface Task {
   id: string;
   title: string;
@@ -26,7 +32,7 @@ interface Task {
   createdAt: string;
   updatedAt: string;
   tags: string[];
-  comments: any[];
+  comments: TaskComment[];
   completed: boolean;
   checked: boolean;
 }
@@ -91,7 +97,7 @@ const Tasks = () => {
     setTasks(prevTasks => 
       prevTasks.map(task => {
         if (task.id === taskId) {
-          let newStatus: string;
+          let newStatus: 'todo' | 'in-progress' | 'completed' | 'cancelled';
           let newCompleted: boolean;
           
           switch (task.status) {
@@ -119,17 +125,6 @@ const Tasks = () => {
     );
   };
 
-  const handleTaskCheck = (taskId: string) => {
-    setTasks(prevTasks => 
-      prevTasks.map(task => {
-        if (task.id === taskId) {
-          const newChecked = !task.checked;
-          return { ...task, checked: newChecked };
-        }
-        return task;
-      })
-    );
-  };
 
   const handleNewTask = async () => {
     if (!newTaskData.title.trim()) {
@@ -162,8 +157,6 @@ const Tasks = () => {
         throw new Error('Failed to create task');
       }
 
-      const data = await response.json();
-      
       // Refresh tasks from server
       const refreshResponse = await fetch(`/api/addTasks?owner=${owner}&repo=${repo}`);
       if (refreshResponse.ok) {
@@ -225,8 +218,8 @@ const Tasks = () => {
     if (sortBy === "newest") return new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime();
     if (sortBy === "oldest") return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
     if (sortBy === "priority") {
-      const priorityOrder = { high: 3, medium: 2, low: 1 };
-      return priorityOrder[b.priority] - priorityOrder[a.priority];
+      const priorityOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+      return (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0);
     }
     return 0;
   });

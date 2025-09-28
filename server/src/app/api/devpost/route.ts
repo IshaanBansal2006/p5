@@ -15,10 +15,6 @@ const redis = createClient({
 redis.on('error', (err) => console.log('Redis Client Error', err));
 await redis.connect();
 
-interface DevpostRequest {
-  owner: string;
-  repo: string;
-}
 
 interface DevpostData {
   inspiration: string;
@@ -31,6 +27,48 @@ interface DevpostData {
   built_with_list: string[];
   name: string;
   github_url: string;
+}
+
+interface RepoData {
+  owner: {
+    login: string;
+  };
+  name: string;
+  description: string | null;
+  html_url: string;
+  language: string | null;
+  stargazers_count: number;
+  forks_count: number;
+  created_at: string;
+  updated_at: string;
+  topics?: string[];
+  license?: {
+    name: string;
+  };
+  size: number;
+}
+
+// interface RepoInsights {
+//   totalCommits: number;
+//   contributors: string[];
+//   recentActivity: string;
+//   mainTechnologies: string[];
+//   commits: CommitData[];
+//   issues: IssueData[];
+// }
+
+interface CommitData {
+  commit: {
+    message: string;
+    author: {
+      date: string;
+    };
+  };
+}
+
+interface IssueData {
+  title: string;
+  state: 'open' | 'closed';
 }
 
 // Function to fetch GitHub repository data
@@ -125,7 +163,7 @@ async function fetchTechStack(owner: string, repo: string) {
         }
         // Add more parsers for other file types as needed
       }
-    } catch (error) {
+    } catch {
       // Continue to next file if this one fails
       continue;
     }
@@ -184,7 +222,7 @@ async function getRepoInsights(owner: string, repo: string) {
 }
 
 // Function to generate devpost using AI
-async function generateDevpost(repoData: any, readmeContent: string | null, techStack: string[]): Promise<DevpostData> {
+async function generateDevpost(repoData: RepoData, readmeContent: string | null, techStack: string[]): Promise<DevpostData> {
   // Get additional repository insights
   const insights = await getRepoInsights(repoData.owner.login, repoData.name);
   
@@ -208,12 +246,12 @@ LANGUAGE BREAKDOWN:
 ${Object.entries(insights.languages).map(([lang, bytes]) => `${lang}: ${bytes} bytes`).join('\n')}
 
 RECENT DEVELOPMENT ACTIVITY:
-${insights.commits.slice(0, 10).map((commit: any) => 
+${insights.commits.slice(0, 10).map((commit: CommitData) => 
   `- ${commit.commit.message.split('\n')[0]} (${new Date(commit.commit.author.date).toLocaleDateString()})`
 ).join('\n')}
 
 ISSUES & CHALLENGES CONTEXT:
-${insights.issues.slice(0, 15).map((issue: any) => 
+${insights.issues.slice(0, 15).map((issue: IssueData) => 
   `- ${issue.title} ${issue.state === 'closed' ? '[RESOLVED]' : '[OPEN]'}`
 ).join('\n')}
 
@@ -321,15 +359,15 @@ Return ONLY a JSON object with these exact keys: inspiration, what_it_does, how_
     how_built: `Building ${repoData.name} was a journey through ${Object.keys(insights.languages).join(', ')}. ${isActivelyMaintained ? `Over ${repoAge} days of development with ${insights.commits.length} commits,` : 'Through careful development,'} we crafted an architecture that balances performance with maintainability. The core is built in ${primaryLang}, ${techStack.length > 0 ? `with key dependencies on ${techStack.slice(0, 3).join(', ')}` : 'using modern best practices'}.`,
     
     challenges: hasIssues ? 
-      `Development wasn't without its hurdles. ${insights.issues.filter((issue: any) => issue.state === 'closed').length > 0 ? 'We tackled issues ranging from' : 'We\'re actively working on challenges including'} ${insights.issues.slice(0, 2).map((issue: any) => issue.title.toLowerCase()).join(' and ')}. Each obstacle taught us something new about ${primaryLang} development and pushed us to find more elegant solutions.` :
+      `Development wasn't without its hurdles. ${insights.issues.filter((issue: IssueData) => issue.state === 'closed').length > 0 ? 'We tackled issues ranging from' : 'We\'re actively working on challenges including'} ${insights.issues.slice(0, 2).map((issue: IssueData) => issue.title.toLowerCase()).join(' and ')}. Each obstacle taught us something new about ${primaryLang} development and pushed us to find more elegant solutions.` :
       `The biggest challenge was balancing feature completeness with code simplicity. Working with ${primaryLang}, we had to make tough architectural decisions about how to structure the codebase for both current needs and future scalability.`,
     
     accomplishments: `We're particularly proud of ${isPopular ? `earning ${repoData.stargazers_count} stars from the community` : 'building something that solves a real problem'}. ${repoData.forks_count > 10 ? `With ${repoData.forks_count} forks, developers are actively building on our work.` : ''} The clean integration of ${Object.keys(insights.languages).slice(0, 2).join(' and ')} demonstrates that good architecture doesn't have to be complex.`,
     
     learned: `This project deepened our understanding of ${primaryLang} beyond just syntax—we learned about ${techStack.includes('react') ? 'React ecosystem patterns' : techStack.includes('express') ? 'Node.js backend architecture' : `${primaryLang} best practices`}. ${isActivelyMaintained ? 'The iterative development process' : 'Working on this project'} taught us the value of community feedback and the importance of documentation that developers actually want to read.`,
     
-    whats_next: insights.issues.filter((issue: any) => issue.state === 'open').length > 0 ?
-      `The roadmap for ${repoData.name} is driven by community needs. We're prioritizing ${insights.issues.filter((issue: any) => issue.state === 'open').slice(0, 2).map((issue: any) => issue.title.toLowerCase()).join(' and ')}, while also exploring how to expand the core functionality without compromising simplicity.` :
+    whats_next: insights.issues.filter((issue: IssueData) => issue.state === 'open').length > 0 ?
+      `The roadmap for ${repoData.name} is driven by community needs. We're prioritizing ${insights.issues.filter((issue: IssueData) => issue.state === 'open').slice(0, 2).map((issue: IssueData) => issue.title.toLowerCase()).join(' and ')}, while also exploring how to expand the core functionality without compromising simplicity.` :
       `Future development focuses on performance optimization and expanding ${primaryLang} compatibility. We're exploring integration opportunities and considering how ${repoData.name} can evolve with the changing development landscape.`,
     
     built_with_list: [

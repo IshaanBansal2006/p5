@@ -56,11 +56,11 @@ const RepoNotFound = () => {
                 <ul className="text-left space-y-2 text-muted-foreground">
                   <li className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                    Repository doesn't exist or is private
+                    Repository doesn&apos;t exist or is private
                   </li>
                   <li className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                    Repository hasn't been initialized with P5
+                    Repository hasn&apos;t been initialized with P5
                   </li>
                   <li className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-red-500 rounded-full"></div>

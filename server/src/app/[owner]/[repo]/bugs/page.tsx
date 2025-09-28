@@ -4,15 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bug, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Clock, Zap, Filter, X, TriangleAlert as AlertTriangle } from "lucide-react";
+import { Bug, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Clock, Zap, Filter, TriangleAlert as AlertTriangle } from "lucide-react";
 import { useState } from "react";
-import { useParams } from "next/navigation";
-import Link from "next/link";
 import RepoLayout from "@/components/RepoLayout";
 
 const RepoBugs = () => {
-  const params = useParams();
-  const { owner, repo } = params;
   const [showFilter, setShowFilter] = useState(false);
   const [filterPriority, setFilterPriority] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -151,8 +147,8 @@ const RepoBugs = () => {
     if (sortBy === "newest") return new Date(b.created).getTime() - new Date(a.created).getTime();
     if (sortBy === "oldest") return new Date(a.created).getTime() - new Date(b.created).getTime();
     if (sortBy === "priority") {
-      const priorityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
-      return priorityOrder[b.severity] - priorityOrder[a.severity];
+      const priorityOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+      return (priorityOrder[b.severity] || 0) - (priorityOrder[a.severity] || 0);
     }
     return 0;
   });

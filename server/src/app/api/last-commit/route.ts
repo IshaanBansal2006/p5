@@ -61,12 +61,12 @@ export async function GET(request: NextRequest) {
       }
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in last-commit endpoint:', error);
     
-    if (error.status === 404) {
+    if (error && typeof error === 'object' && 'status' in error && error.status === 404) {
       return NextResponse.json(
-        { error: `Repository ${owner}/${repo} not found` },
+        { error: 'Repository not found' },
         { status: 404 }
       );
     }

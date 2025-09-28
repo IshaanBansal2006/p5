@@ -1,34 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from 'redis';
+import { redis } from '@/lib/redis';
 import { Octokit } from '@octokit/rest';
 
-// Redis client configuration
-const redis = createClient({
-  username: 'default',
-  password: process.env.REDIS_PASSWORD,
-  socket: {
-    host: process.env.REDIS_HOST,
-    port: parseInt(process.env.REDIS_PORT || '6379')
-  }
-});
-
-// Connect to Redis
-redis.on('error', (err) => console.log('Redis Client Error', err));
-await redis.connect();
 
 // GitHub API client for validation
 const octokit = new Octokit({
   auth: process.env.GITHUB_TOKEN,
 });
 
-interface RegisterRequest {
-  owner: string;
-  repo: string;
+
+interface Bug {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  priority: string;
+  assignee: string;
+  reporter: string;
+  createdAt: string;
+  updatedAt: string;
+  labels: string[];
+}
+
+interface Task {
+  id: string;
+  title: string;
+  description: string;
+  priority: string;
+  status: string;
+  assignee: string;
+  reporter: string;
+  dueDate: string;
+  createdAt: string;
+  updatedAt: string;
+  tags: string[];
+  comments: { id: string; author: string; content: string; createdAt: string; }[];
+  completed: boolean;
+  checked: boolean;
 }
 
 interface RepositoryData {
-  bugs: any[];
-  tasks: any[];
+  bugs: Bug[];
+  tasks: Task[];
 }
 
 export async function GET(request: NextRequest) {
@@ -42,7 +55,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         { error: 'Missing required parameters: owner and repo' },
         { status: 400 }
-      ); 11427
+      );
     }
 
     // Validate parameter format (basic validation)
@@ -56,7 +69,7 @@ export async function GET(request: NextRequest) {
     // Validate that the repository exists on GitHub
     try {
       await octokit.rest.repos.get({ owner, repo });
-    } catch (error) {
+    } catch {
       return NextResponse.json(
         { error: `Repository ${owner}/${repo} not found on GitHub` },
         { status: 404 }
@@ -67,8 +80,8 @@ export async function GET(request: NextRequest) {
     const key = `${owner}-${repo}`;
 
     // Check if the key already exists
-    const exists = await redis.exists(key);
-    if (exists) {
+    const existingData = await redis.get(key);
+    if (existingData) {
       return NextResponse.json(
         { error: `Repository ${owner}/${repo} is already registered` },
         { status: 409 }
@@ -93,8 +106,8 @@ export async function GET(request: NextRequest) {
       { status: 201 }
     );
 
-  } catch (error) {
-    console.error('Error in register endpoint:', error);
+  } catch {
+    console.error('Error in register endpoint');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

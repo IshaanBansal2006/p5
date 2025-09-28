@@ -15,10 +15,6 @@ const redis = createClient({
 redis.on('error', (err) => console.log('Redis Client Error', err));
 await redis.connect();
 
-interface ReadmeRequest {
-  owner: string;
-  repo: string;
-}
 
 interface ReadmeData {
   title: string;
@@ -33,6 +29,40 @@ interface ReadmeData {
   tech_stack: string[];
   name: string;
   github_url: string;
+}
+
+interface RepoData {
+  owner: {
+    login: string;
+  };
+  name: string;
+  description: string | null;
+  html_url: string;
+  language: string | null;
+  stargazers_count: number;
+  forks_count: number;
+  created_at: string;
+  updated_at: string;
+  topics?: string[];
+  license?: {
+    name: string;
+  };
+  homepage?: string;
+}
+
+// interface RepoInsights {
+//   tree: FileData[];
+//   releases: ReleaseData[];
+// }
+
+interface FileData {
+  path: string;
+}
+
+interface ReleaseData {
+  tag_name: string;
+  name: string | null;
+  published_at: string;
 }
 
 // Function to format README data into markdown
@@ -177,7 +207,7 @@ async function fetchTechStack(owner: string, repo: string) {
           });
         }
       }
-    } catch (error) {
+    } catch {
       continue;
     }
   }
@@ -235,20 +265,20 @@ async function getRepoInsights(owner: string, repo: string) {
 }
 
 // Function to generate README using AI
-async function generateReadme(repoData: any, existingReadme: string | null, techStack: string[]): Promise<ReadmeData> {
+async function generateReadme(repoData: RepoData, existingReadme: string | null, techStack: string[]): Promise<ReadmeData> {
   // Get additional repository insights
   const insights = await getRepoInsights(repoData.owner.login, repoData.name);
   
   // Analyze project structure
-  const hasTests = insights.tree.some((file: any) => 
+  const hasTests = insights.tree.some((file: FileData) => 
     file.path.includes('test') || file.path.includes('spec') || file.path.endsWith('.test.js') || file.path.endsWith('.spec.js')
   );
   
-  const hasDocker = insights.tree.some((file: any) => 
+  const hasDocker = insights.tree.some((file: FileData) => 
     file.path.includes('Dockerfile') || file.path.includes('docker-compose')
   );
   
-  const hasCI = insights.tree.some((file: any) => 
+  const hasCI = insights.tree.some((file: FileData) => 
     file.path.includes('.github/workflows') || file.path.includes('.gitlab-ci') || file.path.includes('.travis')
   );
   
@@ -257,7 +287,7 @@ async function generateReadme(repoData: any, existingReadme: string | null, tech
                        techStack.some(tech => ['react', 'vue', 'angular', 'next', 'nuxt'].includes(tech));
                        
   const isAPIProject = techStack.some(tech => ['express', 'fastapi', 'flask', 'django', 'spring'].includes(tech)) ||
-                       insights.tree.some((file: any) => file.path.includes('api/') || file.path.includes('routes/'));
+                       insights.tree.some((file: FileData) => file.path.includes('api/') || file.path.includes('routes/'));
 
   // Create a rich, contextual prompt
   const contextualPrompt = `
@@ -284,7 +314,7 @@ LANGUAGE BREAKDOWN:
 ${Object.entries(insights.languages).map(([lang, bytes]) => `${lang}: ${bytes} bytes`).join('\n')}
 
 PROJECT STRUCTURE INSIGHTS:
-${insights.tree.slice(0, 20).map((file: any) => `- ${file.path}`).join('\n')}
+${insights.tree.slice(0, 20).map((file: FileData) => `- ${file.path}`).join('\n')}
 
 EXISTING README (if any):
 ${existingReadme || 'No existing README found'}
@@ -293,7 +323,7 @@ DETECTED TECH STACK:
 ${techStack.join(', ')}
 
 RECENT RELEASES:
-${insights.releases.slice(0, 3).map((release: any) => 
+${insights.releases.slice(0, 3).map((release: ReleaseData) => 
   `- ${release.tag_name}: ${release.name || 'No title'} (${new Date(release.published_at).toLocaleDateString()})`
 ).join('\n')}
 

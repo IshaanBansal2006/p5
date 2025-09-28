@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Terminal, Zap, Shield, FileText, Eye, Github, Book, Download, Code, Settings } from "lucide-react";
+import { Terminal, Zap, Shield, FileText, Eye, Github, Book, Download, Settings } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 
