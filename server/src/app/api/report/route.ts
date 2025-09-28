@@ -55,32 +55,6 @@ interface Bug {
   checked: boolean;
 }
 
-// Repository data structure to match the standard schema
-interface RepositoryData {
-  bugs: Bug[];
-  tasks: Array<{
-    id: string;
-    title: string;
-    description: string;
-    priority: string;
-    status: string;
-    assignee: string;
-    reporter: string;
-    dueDate: string;
-    createdAt: string;
-    updatedAt: string;
-    tags: string[];
-    comments: Array<{
-      id: string;
-      author: string;
-      content: string;
-      createdAt: string;
-    }>;
-    completed: boolean;
-    checked: boolean;
-  }>;
-}
-
 
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
@@ -190,7 +164,7 @@ RESPONSE FORMAT (JSON only, no markdown):
       };
       taskName: string;
       errorType: string;
-    }, index: number) => {
+    }) => {
       const now = new Date().toISOString();
 
       // Create a comprehensive description that includes the suggested fix
@@ -239,7 +213,7 @@ RESPONSE FORMAT (JSON only, no markdown):
     console.error('Error processing with Gemini:', error);
 
     // Fallback: basic deduplication without AI
-    const uniqueBugs = errors.reduce((acc: Bug[], curr, index) => {
+    const uniqueBugs = errors.reduce((acc: Bug[], curr) => {
       const existing = acc.find(bug =>
         bug.description.includes(curr.message) &&
         bug.title.includes(curr.taskName)

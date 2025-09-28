@@ -168,6 +168,9 @@ export async function GET(request: NextRequest) {
       octokit.rest.repos.listLanguages({ owner, repo })
     ]);
 
+    // repoData and languages are used for type checking
+    void repoData;
+    void languages;
 
     // Get detailed commit stats - analyze more commits for better accuracy
     const detailedCommits: CommitData[] = [];

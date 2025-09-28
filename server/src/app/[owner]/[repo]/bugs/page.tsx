@@ -783,7 +783,7 @@ const RepoBugs = () => {
                           <div className="flex items-center gap-2">
                             <span className="text-muted-foreground font-medium">Reported by</span>
                             <ContributorDisplay
-                              assignee={bug.reporter}
+                              assignee={bug.reporter || 'Unknown'}
                               owner={owner as string}
                               repo={repo as string}
                             />
@@ -792,7 +792,7 @@ const RepoBugs = () => {
                           <div className="flex items-center gap-2">
                             <span className="text-muted-foreground font-medium">Assigned to</span>
                             <ContributorDisplay
-                              assignee={bug.assignee}
+                              assignee={bug.assignee || 'Unassigned'}
                               owner={owner as string}
                               repo={repo as string}
                             />

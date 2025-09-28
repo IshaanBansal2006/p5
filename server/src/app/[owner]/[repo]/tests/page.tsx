@@ -18,14 +18,13 @@ import {
   Zap,
   Bug,
   Activity,
-  TrendingUp,
-  BarChart3,
   GitCommit,
   ExternalLink,
   User
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
+import Image from "next/image";
 import RepoLayout from "@/components/RepoLayout";
 
 // Interface for test execution data
@@ -385,10 +384,12 @@ const Tests = () => {
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <div className="flex items-center gap-1">
             {commit.avatar_url ? (
-              <img 
+              <Image 
                 src={commit.avatar_url} 
                 alt={commit.author}
-                className="w-4 h-4 rounded-full"
+                width={16}
+                height={16}
+                className="rounded-full"
               />
             ) : (
               <User className="w-4 h-4" />
@@ -416,34 +417,36 @@ const Tests = () => {
     return true;
   });
 
+  const currentExecutions = showDetailed ? detailedExecutions : testExecutions;
+  
   const testStats = [
     { 
       icon: Play, 
       label: "Total Executions", 
-      value: testExecutions.length.toString(), 
+      value: currentExecutions.length.toString(), 
       color: "text-blue-500" 
     },
     { 
       icon: CheckCircle, 
       label: "Passed", 
-      value: testExecutions.filter(t => t.totalErrors === 0 && t.totalWarnings === 0).length.toString(), 
+      value: currentExecutions.filter(t => t.totalErrors === 0 && t.totalWarnings === 0).length.toString(), 
       color: "text-green-500" 
     },
     { 
       icon: XCircle, 
       label: "Failed", 
-      value: testExecutions.filter(t => t.totalErrors > 0).length.toString(), 
+      value: currentExecutions.filter(t => t.totalErrors > 0).length.toString(), 
       color: "text-red-500" 
     },
     { 
       icon: AlertTriangle, 
       label: "Warnings", 
-      value: testExecutions.filter(t => t.totalErrors === 0 && t.totalWarnings > 0).length.toString(), 
+      value: currentExecutions.filter(t => t.totalErrors === 0 && t.totalWarnings > 0).length.toString(), 
       color: "text-yellow-500" 
     },
   ];
 
-  const stages = [...new Set(testExecutions.map(execution => execution.stage))];
+  const stages = [...new Set(currentExecutions.map(execution => execution.stage))];
 
   if (loading) {
     return (
@@ -612,7 +615,7 @@ const Tests = () => {
                 </p>
               </div>
             ) : (
-              filteredTimelineItems.map((item, index) => (
+              filteredTimelineItems.map((item) => (
                 <div key={item.id}>
                   {item.type === 'test' ? (
                     <div className="p-4 rounded-lg bg-background/20 border border-border/20 hover:border-primary/20 transition-smooth">

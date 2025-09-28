@@ -305,7 +305,7 @@ const RepoStats = () => {
                       tickFormatter={(value) => value.toLocaleString()}
                     />
                     <Tooltip
-                      content={({ active, payload, label }) => {
+                      content={({ active, payload }) => {
                         if (active && payload && payload.length) {
                           const data = payload[0].payload;
                           return (
