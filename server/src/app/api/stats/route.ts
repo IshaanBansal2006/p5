@@ -110,8 +110,36 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Force regeneration for debugging or if we detect incorrect cached data
+    const forceRegenerate = searchParams.get('force') === 'true';
+    
+    // Check if cached data has incorrect lines of code (less than 1M suggests old calculation)
+    let shouldClearCache = false;
+    if (cachedStats) {
+      try {
+        const parsedStats = JSON.parse(cachedStats);
+        if (parsedStats.stats?.totalLinesOfCode?.current < 1000000) {
+          console.log('Detected incorrect cached lines of code, clearing cache');
+          shouldClearCache = true;
+        }
+      } catch (error) {
+        console.warn('Failed to parse cached stats for validation:', error);
+      }
+    }
+    
+    // Clear cache if we detected incorrect data
+    if (shouldClearCache) {
+      try {
+        await redis.del(statsCacheKey);
+        await redis.del(statsGeneratedKey);
+        console.log('Cleared cache due to incorrect lines of code data');
+      } catch (delError) {
+        console.warn('Failed to clear cache:', delError);
+      }
+    }
+    
     // Return cached stats if they're still valid
-    if (cachedStats && !shouldRegenerate) {
+    if (cachedStats && !shouldRegenerate && !forceRegenerate && !shouldClearCache) {
       try {
         const parsedStats = JSON.parse(cachedStats);
         return NextResponse.json(parsedStats);
@@ -132,17 +160,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch repository data from GitHub
-    const [, commits, branches, contributors] = await Promise.all([
+    const [repoData, commits, branches, contributors, languages] = await Promise.all([
       octokit.rest.repos.get({ owner, repo }),
       octokit.rest.repos.listCommits({ owner, repo, per_page: 100 }),
       octokit.rest.repos.listBranches({ owner, repo, per_page: 100 }),
-      octokit.rest.repos.listContributors({ owner, repo, per_page: 100 })
+      octokit.rest.repos.listContributors({ owner, repo, per_page: 100 }),
+      octokit.rest.repos.listLanguages({ owner, repo })
     ]);
 
 
-    // Get detailed commit stats
+    // Get detailed commit stats - analyze more commits for better accuracy
     const detailedCommits: CommitData[] = [];
-    for (const commit of commits.data.slice(0, 50)) {
+    for (const commit of commits.data.slice(0, 100)) {
       try {
         const commitDetail = await octokit.rest.repos.getCommit({
           owner,
@@ -203,10 +232,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Calculate contributor statistics (mimicking debug endpoint exactly)
+    // Calculate contributor statistics using detailed commit data for accurate lines of code
     const contributorMap = new Map<string, ContributorStats>();
     
-    // First, process detailed commits for accurate stats
+    // Process detailed commits for accurate lines of code and commit counts
     for (const commit of detailedCommits) {
       const author = commit.author;
       if (author === 'System') continue; // Skip system commits
@@ -237,17 +266,15 @@ export async function GET(request: NextRequest) {
       contributorMap.set(author, existing);
     }
     
-    // Then process all commits to get total commit counts
+    // Process all commits to get total commit counts (including those not in detailedCommits)
     for (const commit of commits.data) {
       let author = commit.commit.author?.name || commit.author?.login || 'Unknown';
-      let avatarUrl = commit.author?.avatar_url;
       
       // Apply same filtering as detailed commits
       if (author === 'root' || author === 'noreply@github.com' || author === 'GitHub' || 
           author.toLowerCase().includes('bot') || author.toLowerCase().includes('action') ||
           author === 'Unknown' || !author.trim()) {
         author = 'System';
-        avatarUrl = undefined;
       } else {
         author = author.trim();
         if (commit.commit.author?.name && commit.author?.login) {
@@ -257,26 +284,29 @@ export async function GET(request: NextRequest) {
       
       if (author === 'System') continue; // Skip system commits
       
-      const existing = contributorMap.get(author) || {
-        name: author,
-        commits: 0,
-        additions: 0,
-        deletions: 0,
-        branches: 0,
-        merges: 0,
-        avatar_url: avatarUrl
-      };
-
-      // Only increment commits if we haven't already processed this commit in detailedCommits
-      if (!detailedCommits.some(dc => dc.sha === commit.sha)) {
-        existing.commits += 1;
-        if (commit.commit.message.toLowerCase().includes('merge')) {
-          existing.merges += 1;
+      const existing = contributorMap.get(author);
+      if (existing) {
+        // Only increment commits if we haven't already processed this commit in detailedCommits
+        if (!detailedCommits.some(dc => dc.sha === commit.sha)) {
+          existing.commits += 1;
+          if (commit.commit.message.toLowerCase().includes('merge')) {
+            existing.merges += 1;
+          }
         }
+      } else {
+        // Create new entry for contributors not in detailed commits
+        contributorMap.set(author, {
+          name: author,
+          commits: 1,
+          additions: 0,
+          deletions: 0,
+          branches: 0,
+          merges: commit.commit.message.toLowerCase().includes('merge') ? 1 : 0,
+          avatar_url: commit.author?.avatar_url
+        });
       }
-
-      contributorMap.set(author, existing);
     }
+    
 
     // Count branches per contributor
     for (const branch of branches.data) {
@@ -298,34 +328,15 @@ export async function GET(request: NextRequest) {
           author = 'System';
         }
         
-        const existing = contributorMap.get(author) || {
-          name: author,
-          commits: 0,
-          additions: 0,
-          deletions: 0,
-          branches: 0,
-          merges: 0
-        };
-        existing.branches += 1;
-        contributorMap.set(author, existing);
+        const existing = contributorMap.get(author);
+        if (existing) {
+          existing.branches += 1;
+        }
       }
     }
 
     const contributorStats = Array.from(contributorMap.values())
       .filter(contributor => contributor.name !== 'System' && contributor.commits > 0);
-
-    // Fill in missing avatar URLs from GitHub contributors API
-    for (const contributor of contributorStats) {
-      if (!contributor.avatar_url) {
-        const githubContributor = contributors.data.find(c => 
-          c.login && (c.login === contributor.name || 
-          c.login.toLowerCase() === contributor.name.toLowerCase())
-        );
-        if (githubContributor) {
-          contributor.avatar_url = githubContributor.avatar_url;
-        }
-      }
-    }
 
     // Calculate awards
     const awards: Awards = {
@@ -339,10 +350,20 @@ export async function GET(request: NextRequest) {
         curr.commits < min.commits ? curr : min, contributorStats[0] || { name: 'None', commits: 0 })
     };
 
-    // Calculate total lines of code from detailed commits
-    const totalLinesOfCode = detailedCommits.reduce((total, commit) => {
-      return total + commit.additions - commit.deletions;
-    }, 0);
+    // Calculate total lines of code from GitHub languages API
+    let totalLinesOfCode = 0;
+    if (languages.data && typeof languages.data === 'object') {
+      totalLinesOfCode = Object.values(languages.data).reduce((total, lines) => {
+        const numLines = typeof lines === 'number' ? lines : 0;
+        return total + numLines;
+      }, 0);
+    } else {
+      console.error('Languages data is not valid, falling back to commit-based calculation:', languages.data);
+      // Fallback to old calculation if languages API fails
+      totalLinesOfCode = detailedCommits.reduce((total, commit) => {
+        return total + commit.additions - commit.deletions;
+      }, 0);
+    }
 
     // Calculate current stats
     const currentStats = {
@@ -409,7 +430,7 @@ export async function GET(request: NextRequest) {
       totalCommits: { current: currentStats.totalCommits, percentChange: percentChanges.totalCommits },
       totalContributors: { current: currentStats.totalContributors, percentChange: percentChanges.totalContributors },
       totalLinesOfCode: { current: currentStats.totalLinesOfCode, percentChange: percentChanges.totalLinesOfCode },
-      commitsAnalyzed: Math.min(100, commits.data.length)
+      commitsAnalyzed: Math.min(100, detailedCommits.length)
     };
 
     // Keep commits in the same order as debug endpoint (GitHub's original order)
