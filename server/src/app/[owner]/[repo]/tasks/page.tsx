@@ -85,6 +85,13 @@ const Tasks = () => {
 
         const data = await response.json();
         console.log('Tasks data received:', data);
+        
+        // Check if the repository exists (has been initialized)
+        if (response.status === 404) {
+          setError('Repository not found or not initialized with P5');
+          return;
+        }
+        
         setTasks(data.tasks || []);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'An error occurred';

@@ -77,6 +77,10 @@ const RepoStats = () => {
         setLoading(true);
         const response = await fetch(`/api/stats?owner=${owner}&repo=${repo}`);
         if (!response.ok) {
+          if (response.status === 404) {
+            setError('Repository not found or not initialized with P5');
+            return;
+          }
           throw new Error('Failed to fetch stats');
         }
         const data = await response.json();

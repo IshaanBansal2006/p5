@@ -76,6 +76,13 @@ const RepoBugs = () => {
         
         const data = await response.json();
         console.log('Bugs data received:', data);
+        
+        // Check if the repository exists (has been initialized)
+        if (response.status === 404) {
+          setError('Repository not found or not initialized with P5');
+          return;
+        }
+        
         setBugs(data.bugs || []);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'An error occurred';
