@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Bug, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Clock, Zap, Filter, TriangleAlert as AlertTriangle, Plus, Loader2 } from "lucide-react";
+import { Bug, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Clock, Zap, Filter, TriangleAlert as AlertTriangle, Plus, Loader2, Edit2, Save, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import RepoLayout from "@/components/RepoLayout";
@@ -39,6 +39,8 @@ const RepoBugs = () => {
   const [bugs, setBugs] = useState<Bug[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingBug, setEditingBug] = useState<string | null>(null);
+  const [editBugData, setEditBugData] = useState<Partial<Bug>>({});
 
   const [newBugData, setNewBugData] = useState({
     title: "",
@@ -105,6 +107,7 @@ const RepoBugs = () => {
       case "open": return "border-red-500 text-red-500";
       case "in-progress": return "border-yellow-500 text-yellow-500";
       case "resolved": return "border-green-500 text-green-500";
+      case "closed": return "border-gray-500 text-gray-500";
       default: return "border-gray-500 text-gray-500";
     }
   };
@@ -173,38 +176,24 @@ const RepoBugs = () => {
     }
   };
 
-  const handleBugCheck = async (bugId: string) => {
-    // Find the current bug to determine new status
-    const currentBug = bugs.find(bug => bug.id === bugId);
-    if (!currentBug) return;
+  const handleEditBug = (bug: Bug) => {
+    setEditingBug(bug.id);
+    setEditBugData({
+      title: bug.title,
+      description: bug.description,
+      severity: bug.severity,
+      status: bug.status,
+      assignee: bug.assignee,
+      reporter: bug.reporter,
+      labels: bug.labels
+    });
+  };
 
-    let newStatus: 'open' | 'in-progress' | 'resolved' | 'closed';
-    
-    switch (currentBug.status) {
-      case "open":
-        newStatus = "in-progress";
-        break;
-      case "in-progress":
-        newStatus = "resolved";
-        break;
-      case "resolved":
-        newStatus = "open";
-        break;
-      default:
-        newStatus = "open";
+  const handleSaveEdit = async () => {
+    if (!editingBug || !editBugData.title?.trim()) {
+      return;
     }
 
-    // Optimistically update the UI
-    setBugs(prevBugs => 
-      prevBugs.map(bug => {
-        if (bug.id === bugId) {
-          return { ...bug, status: newStatus, updatedAt: new Date().toISOString() };
-        }
-        return bug;
-      })
-    );
-
-    // Update the bug status in Redis
     try {
       const response = await fetch('/api/updateBug', {
         method: 'PUT',
@@ -214,45 +203,64 @@ const RepoBugs = () => {
         body: JSON.stringify({
           owner,
           repo,
-          bugId,
-          status: newStatus
+          bugId: editingBug,
+          ...editBugData,
+          updatedAt: new Date().toISOString()
         })
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Failed to update bug status:', errorData);
-        
-        // Revert the optimistic update on error
-        setBugs(prevBugs => 
-          prevBugs.map(bug => {
-            if (bug.id === bugId) {
-              return currentBug; // Revert to original state
-            }
-            return bug;
-          })
-        );
-        
-        setError('Failed to update bug status');
-        return;
+        throw new Error('Failed to update bug');
       }
 
-      console.log(`Bug ${bugId} status updated to ${newStatus}`);
-    } catch (error) {
-      console.error('Error updating bug status:', error);
-      
-      // Revert the optimistic update on error
+      // Update the bug in the local state
       setBugs(prevBugs => 
         prevBugs.map(bug => {
-          if (bug.id === bugId) {
-            return currentBug; // Revert to original state
+          if (bug.id === editingBug) {
+            return { ...bug, ...editBugData, updatedAt: new Date().toISOString() };
           }
           return bug;
         })
       );
-      
-      setError('Failed to update bug status');
+
+      setEditingBug(null);
+      setEditBugData({});
+    } catch (error) {
+      console.error('Error updating bug:', error);
+      setError('Failed to update bug');
     }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingBug(null);
+    setEditBugData({});
+  };
+
+  const handleBugCheck = (bugId: string) => {
+    setBugs(prevBugs => 
+      prevBugs.map(bug => {
+        if (bug.id === bugId) {
+          let newStatus: 'open' | 'in-progress' | 'resolved' | 'closed';
+          
+          switch (bug.status) {
+            case "open":
+              newStatus = "in-progress";
+              break;
+            case "in-progress":
+              newStatus = "resolved";
+              break;
+            case "resolved":
+              newStatus = "open";
+              break;
+            default:
+              newStatus = "open";
+          }
+          
+          return { ...bug, status: newStatus, updatedAt: new Date().toISOString() };
+        }
+        return bug;
+      })
+    );
   };
 
   const filteredBugs = bugs.filter(bug => {
@@ -369,6 +377,7 @@ const RepoBugs = () => {
                             <SelectItem value="open">Open</SelectItem>
                             <SelectItem value="in-progress">In Progress</SelectItem>
                             <SelectItem value="resolved">Resolved</SelectItem>
+                            <SelectItem value="closed">Closed</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -508,39 +517,157 @@ const RepoBugs = () => {
             <div className="space-y-4">
               {filteredBugs.map((bug, index) => (
                 <div key={index} className="p-4 rounded-lg bg-background/20 border border-border/20 hover:border-primary/20 transition-smooth">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-start gap-3">
-                      <div 
-                        className="mt-1 cursor-pointer hover:scale-110 transition-transform"
-                        onClick={() => handleBugCheck(bug.id)}
-                      >
-                        {getStatusIcon(bug.status)}
+                  {editingBug === bug.id ? (
+                    // Edit Mode
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor={`edit-title-${bug.id}`}>Title *</Label>
+                          <Input
+                            id={`edit-title-${bug.id}`}
+                            value={editBugData.title || ''}
+                            onChange={(e) => setEditBugData(prev => ({ ...prev, title: e.target.value }))}
+                            placeholder="Enter bug title"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`edit-severity-${bug.id}`}>Severity</Label>
+                          <Select 
+                            value={editBugData.severity || 'medium'} 
+                            onValueChange={(value) => setEditBugData(prev => ({ ...prev, severity: value as 'low' | 'medium' | 'high' | 'critical' }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="critical">Critical</SelectItem>
+                              <SelectItem value="high">High</SelectItem>
+                              <SelectItem value="medium">Medium</SelectItem>
+                              <SelectItem value="low">Low</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
-                      <span className="text-sm font-mono text-muted-foreground">{bug.id}</span>
-                      <div className={`w-3 h-3 rounded-full ${getSeverityColor(bug.severity)} mt-1`}></div>
-                      <h4 className="font-medium">{bug.title}</h4>
+                      <div>
+                        <Label htmlFor={`edit-description-${bug.id}`}>Description</Label>
+                        <Textarea
+                          id={`edit-description-${bug.id}`}
+                          value={editBugData.description || ''}
+                          onChange={(e) => setEditBugData(prev => ({ ...prev, description: e.target.value }))}
+                          placeholder="Describe the bug in detail"
+                          rows={3}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor={`edit-status-${bug.id}`}>Status</Label>
+                          <Select 
+                            value={editBugData.status || 'open'} 
+                            onValueChange={(value) => setEditBugData(prev => ({ ...prev, status: value as 'open' | 'in-progress' | 'resolved' | 'closed' }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="open">Open</SelectItem>
+                              <SelectItem value="in-progress">In Progress</SelectItem>
+                              <SelectItem value="resolved">Resolved</SelectItem>
+                              <SelectItem value="closed">Closed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor={`edit-assignee-${bug.id}`}>Assignee</Label>
+                          <Input
+                            id={`edit-assignee-${bug.id}`}
+                            value={editBugData.assignee || ''}
+                            onChange={(e) => setEditBugData(prev => ({ ...prev, assignee: e.target.value }))}
+                            placeholder="Enter assignee"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor={`edit-reporter-${bug.id}`}>Reporter</Label>
+                        <Input
+                          id={`edit-reporter-${bug.id}`}
+                          value={editBugData.reporter || ''}
+                          onChange={(e) => setEditBugData(prev => ({ ...prev, reporter: e.target.value }))}
+                          placeholder="Enter reporter"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`edit-labels-${bug.id}`}>Labels (comma-separated)</Label>
+                        <Input
+                          id={`edit-labels-${bug.id}`}
+                          value={editBugData.labels?.join(', ') || ''}
+                          onChange={(e) => setEditBugData(prev => ({ ...prev, labels: e.target.value.split(',').map(l => l.trim()) }))}
+                          placeholder="e.g., frontend, api, critical"
+                        />
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <Button variant="outline" onClick={handleCancelEdit}>
+                          <X className="w-4 h-4 mr-2" />
+                          Cancel
+                        </Button>
+                        <Button onClick={handleSaveEdit}>
+                          <Save className="w-4 h-4 mr-2" />
+                          Save
+                        </Button>
+                      </div>
                     </div>
-                    <Badge variant="outline" className={getStatusColor(bug.status)}>
-                      {bug.status.replace('-', ' ')}
-                    </Badge>
-                  </div>
+                  ) : (
+                    // View Mode
+                    <>
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-start gap-3">
+                          <div 
+                            className="mt-1 cursor-pointer hover:scale-110 transition-transform"
+                            onClick={() => handleBugCheck(bug.id)}
+                          >
+                            {getStatusIcon(bug.status)}
+                          </div>
+                          <span className="text-sm font-mono text-muted-foreground">{bug.id}</span>
+                          <div className={`w-3 h-3 rounded-full ${getSeverityColor(bug.severity)} mt-1`}></div>
+                          <h4 className="font-medium">{bug.title}</h4>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className={getStatusColor(bug.status)}>
+                            {bug.status.replace('-', ' ')}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditBug(bug)}
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span>Reported by {bug.reporter}</span>
-                      <span>•</span>
-                      <span>Assigned to {bug.assignee}</span>
-                      <span>•</span>
-                      <span>{new Date(bug.createdAt).toLocaleDateString()}</span>
-                    </div>
-                    <div className="flex gap-1">
-                      {bug.labels.map((label, labelIndex) => (
-                        <Badge key={labelIndex} variant="secondary" className="text-xs">
-                          {label}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
+                      {bug.description && bug.description.trim() !== ' ' && (
+                        <div className="mb-3 text-sm text-muted-foreground">
+                          {bug.description}
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <span>Reported by {bug.reporter}</span>
+                          <span>•</span>
+                          <span>Assigned to {bug.assignee}</span>
+                          <span>•</span>
+                          <span>{new Date(bug.createdAt).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex gap-1">
+                          {bug.labels.map((label, labelIndex) => (
+                            <Badge key={labelIndex} variant="secondary" className="text-xs">
+                              {label}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               ))}
             </div>

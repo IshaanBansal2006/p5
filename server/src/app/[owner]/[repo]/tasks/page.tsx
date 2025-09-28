@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { SquareCheck as CheckSquare, Square, Clock, Plus, Zap, Filter, Loader2 } from "lucide-react";
+import { SquareCheck as CheckSquare, Square, Clock, Plus, Zap, Filter, Loader2, Edit2, Save, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import RepoLayout from "@/components/RepoLayout";
@@ -49,6 +49,8 @@ const Tasks = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingTask, setEditingTask] = useState<string | null>(null);
+  const [editTaskData, setEditTaskData] = useState<Partial<Task>>({});
 
   const [newTaskData, setNewTaskData] = useState({
     title: "",
@@ -129,7 +131,7 @@ const Tasks = () => {
     setTasks(prevTasks => 
       prevTasks.map(task => {
         if (task.id === taskId) {
-          return { ...task, status: newStatus, completed: newCompleted };
+          return { ...task, status: newStatus, completed: newCompleted, updatedAt: new Date().toISOString() };
         }
         return task;
       })
@@ -151,41 +153,21 @@ const Tasks = () => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Failed to update task status:', errorData);
-        
-        // Revert the optimistic update on error
-        setTasks(prevTasks => 
-          prevTasks.map(task => {
-            if (task.id === taskId) {
-              return currentTask; // Revert to original state
-            }
-            return task;
-          })
-        );
-        
-        setError('Failed to update task status');
-        return;
+        throw new Error('Failed to update task status');
       }
-
-      console.log(`Task ${taskId} status updated to ${newStatus}`);
     } catch (error) {
       console.error('Error updating task status:', error);
-      
       // Revert the optimistic update on error
       setTasks(prevTasks => 
         prevTasks.map(task => {
           if (task.id === taskId) {
-            return currentTask; // Revert to original state
+            return currentTask; // Revert to original task
           }
           return task;
         })
       );
-      
-      setError('Failed to update task status');
     }
   };
-
 
   const handleNewTask = async () => {
     if (!newTaskData.title.trim()) {
@@ -207,9 +189,9 @@ const Tasks = () => {
             priority: newTaskData.priority,
             status: "todo",
             assignee: newTaskData.assignee || "unassigned",
-            reporter: "current_user", // In a real app, this would be the logged-in user
+            reporter: "current_user",
             dueDate: newTaskData.dueDate,
-            tags: []
+            tags: newTaskData.comments ? newTaskData.comments.split(',').map(t => t.trim()) : []
           }]
         })
       });
@@ -240,34 +222,65 @@ const Tasks = () => {
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "high": return "bg-red-500";
-      case "medium": return "bg-yellow-500";
-      case "low": return "bg-green-500";
-      default: return "bg-gray-500";
+  const handleEditTask = (task: Task) => {
+    setEditingTask(task.id);
+    setEditTaskData({
+      title: task.title,
+      description: task.description,
+      priority: task.priority,
+      status: task.status,
+      assignee: task.assignee,
+      reporter: task.reporter,
+      dueDate: task.dueDate,
+      tags: task.tags
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingTask || !editTaskData.title?.trim()) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/updateTask', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          owner,
+          repo,
+          taskId: editingTask,
+          ...editTaskData,
+          updatedAt: new Date().toISOString()
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update task');
+      }
+
+      // Update the task in the local state
+      setTasks(prevTasks => 
+        prevTasks.map(task => {
+          if (task.id === editingTask) {
+            return { ...task, ...editTaskData, updatedAt: new Date().toISOString() };
+          }
+          return task;
+        })
+      );
+
+      setEditingTask(null);
+      setEditTaskData({});
+    } catch (error) {
+      console.error('Error updating task:', error);
+      setError('Failed to update task');
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "completed": return "border-green-500 text-green-500";
-      case "in-progress": return "border-yellow-500 text-yellow-500";
-      case "todo": return "border-blue-500 text-blue-500";
-      default: return "border-gray-500 text-gray-500";
-    }
-  };
-
-  const getTaskIcon = (status: string) => {
-    switch (status) {
-      case "completed":
-        return <CheckSquare className="w-5 h-5 text-green-500" />;
-      case "in-progress":
-        return <Clock className="w-5 h-5 text-yellow-500" />;
-      case "todo":
-      default:
-        return <Square className="w-5 h-5 text-muted-foreground hover:text-primary" />;
-    }
+  const handleCancelEdit = () => {
+    setEditingTask(null);
+    setEditTaskData({});
   };
 
   const filteredTasks = tasks.filter(task => {
@@ -276,8 +289,8 @@ const Tasks = () => {
     if (filterAssignee !== "all" && task.assignee !== filterAssignee) return false;
     return true;
   }).sort((a, b) => {
-    if (sortBy === "newest") return new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime();
-    if (sortBy === "oldest") return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+    if (sortBy === "newest") return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    if (sortBy === "oldest") return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     if (sortBy === "priority") {
       const priorityOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
       return (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0);
@@ -338,12 +351,12 @@ const Tasks = () => {
             ))}
           </div>
 
-          {/* Task Management */}
+          {/* Task List */}
           <Card className="p-6 bg-gradient-card border-border/40">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <CheckSquare className="w-5 h-5 text-primary" />
-                Project Tasks ({filteredTasks.length})
+                Tasks ({filteredTasks.length})
               </h3>
               <div className="flex gap-2">
                 <Dialog open={showFilter} onOpenChange={setShowFilter}>
@@ -366,6 +379,7 @@ const Tasks = () => {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="all">All Priorities</SelectItem>
+                            <SelectItem value="critical">Critical</SelectItem>
                             <SelectItem value="high">High</SelectItem>
                             <SelectItem value="medium">Medium</SelectItem>
                             <SelectItem value="low">Low</SelectItem>
@@ -383,6 +397,7 @@ const Tasks = () => {
                             <SelectItem value="todo">Todo</SelectItem>
                             <SelectItem value="in-progress">In Progress</SelectItem>
                             <SelectItem value="completed">Completed</SelectItem>
+                            <SelectItem value="cancelled">Cancelled</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -407,8 +422,8 @@ const Tasks = () => {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="newest">Due Date (Newest)</SelectItem>
-                            <SelectItem value="oldest">Due Date (Oldest)</SelectItem>
+                            <SelectItem value="newest">Newest First</SelectItem>
+                            <SelectItem value="oldest">Oldest First</SelectItem>
                             <SelectItem value="priority">Priority</SelectItem>
                           </SelectContent>
                         </Select>
@@ -435,7 +450,7 @@ const Tasks = () => {
                   <DialogTrigger asChild>
                     <Button variant="default" size="sm">
                       <Plus className="w-4 h-4 mr-2" />
-                      New Task
+                      Add Task
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-2xl">
@@ -458,7 +473,7 @@ const Tasks = () => {
                           id="description"
                           value={newTaskData.description}
                           onChange={(e) => setNewTaskData(prev => ({ ...prev, description: e.target.value }))}
-                          placeholder="Enter task description"
+                          placeholder="Describe the task in detail"
                           rows={3}
                         />
                       </div>
@@ -470,6 +485,7 @@ const Tasks = () => {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
+                              <SelectItem value="critical">Critical</SelectItem>
                               <SelectItem value="high">High</SelectItem>
                               <SelectItem value="medium">Medium</SelectItem>
                               <SelectItem value="low">Low</SelectItem>
@@ -496,13 +512,12 @@ const Tasks = () => {
                         />
                       </div>
                       <div>
-                        <Label htmlFor="comments">Comments</Label>
-                        <Textarea
+                        <Label htmlFor="comments">Tags (comma-separated)</Label>
+                        <Input
                           id="comments"
                           value={newTaskData.comments}
                           onChange={(e) => setNewTaskData(prev => ({ ...prev, comments: e.target.value }))}
-                          placeholder="Additional comments or notes"
-                          rows={2}
+                          placeholder="e.g., frontend, api, critical"
                         />
                       </div>
                       <div className="flex gap-2 justify-end">
@@ -521,86 +536,228 @@ const Tasks = () => {
 
             <div className="space-y-4">
               {filteredTasks.map((task, index) => (
-                <div key={index} className={`p-4 rounded-lg bg-background/20 border border-border/20 hover:border-primary/20 transition-smooth ${task.completed ? 'opacity-75' : ''}`}>
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-start gap-3">
-                      <div 
-                        className="mt-1 cursor-pointer hover:scale-110 transition-transform" 
-                        onClick={() => handleTaskClick(task.id)}
-                      >
-                        {getTaskIcon(task.status)}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <span className="text-sm font-mono text-muted-foreground">{task.id}</span>
-                          <div className={`w-3 h-3 rounded-full ${getPriorityColor(task.priority)}`}></div>
-                          <h4 className={`font-medium ${task.completed ? 'line-through text-muted-foreground' : ''}`}>
-                            {task.title}
-                          </h4>
+                <div key={index} className="p-4 rounded-lg bg-background/20 border border-border/20 hover:border-primary/20 transition-smooth">
+                  {editingTask === task.id ? (
+                    // Edit Mode
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor={`edit-title-${task.id}`}>Title *</Label>
+                          <Input
+                            id={`edit-title-${task.id}`}
+                            value={editTaskData.title || ''}
+                            onChange={(e) => setEditTaskData(prev => ({ ...prev, title: e.target.value }))}
+                            placeholder="Enter task title"
+                          />
                         </div>
-                        <p className="text-sm text-muted-foreground mb-3">{task.description}</p>
+                        <div>
+                          <Label htmlFor={`edit-priority-${task.id}`}>Priority</Label>
+                          <Select 
+                            value={editTaskData.priority || 'medium'} 
+                            onValueChange={(value) => setEditTaskData(prev => ({ ...prev, priority: value as 'low' | 'medium' | 'high' | 'critical' }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="critical">Critical</SelectItem>
+                              <SelectItem value="high">High</SelectItem>
+                              <SelectItem value="medium">Medium</SelectItem>
+                              <SelectItem value="low">Low</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor={`edit-description-${task.id}`}>Description</Label>
+                        <Textarea
+                          id={`edit-description-${task.id}`}
+                          value={editTaskData.description || ''}
+                          onChange={(e) => setEditTaskData(prev => ({ ...prev, description: e.target.value }))}
+                          placeholder="Describe the task in detail"
+                          rows={3}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor={`edit-status-${task.id}`}>Status</Label>
+                          <Select 
+                            value={editTaskData.status || 'todo'} 
+                            onValueChange={(value) => setEditTaskData(prev => ({ ...prev, status: value as 'todo' | 'in-progress' | 'completed' | 'cancelled' }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="todo">Todo</SelectItem>
+                              <SelectItem value="in-progress">In Progress</SelectItem>
+                              <SelectItem value="completed">Completed</SelectItem>
+                              <SelectItem value="cancelled">Cancelled</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor={`edit-assignee-${task.id}`}>Assignee</Label>
+                          <Input
+                            id={`edit-assignee-${task.id}`}
+                            value={editTaskData.assignee || ''}
+                            onChange={(e) => setEditTaskData(prev => ({ ...prev, assignee: e.target.value }))}
+                            placeholder="Enter assignee"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor={`edit-reporter-${task.id}`}>Reporter</Label>
+                          <Input
+                            id={`edit-reporter-${task.id}`}
+                            value={editTaskData.reporter || ''}
+                            onChange={(e) => setEditTaskData(prev => ({ ...prev, reporter: e.target.value }))}
+                            placeholder="Enter reporter"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`edit-dueDate-${task.id}`}>Due Date</Label>
+                          <Input
+                            id={`edit-dueDate-${task.id}`}
+                            type="date"
+                            value={editTaskData.dueDate || ''}
+                            onChange={(e) => setEditTaskData(prev => ({ ...prev, dueDate: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor={`edit-tags-${task.id}`}>Tags (comma-separated)</Label>
+                        <Input
+                          id={`edit-tags-${task.id}`}
+                          value={editTaskData.tags?.join(', ') || ''}
+                          onChange={(e) => setEditTaskData(prev => ({ ...prev, tags: e.target.value.split(',').map(t => t.trim()) }))}
+                          placeholder="e.g., frontend, api, critical"
+                        />
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <Button variant="outline" onClick={handleCancelEdit}>
+                          <X className="w-4 h-4 mr-2" />
+                          Cancel
+                        </Button>
+                        <Button onClick={handleSaveEdit}>
+                          <Save className="w-4 h-4 mr-2" />
+                          Save
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    // View Mode
+                    <>
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-start gap-3">
+                          <div 
+                            className="mt-1 cursor-pointer hover:scale-110 transition-transform"
+                            onClick={() => handleTaskClick(task.id)}
+                          >
+                            {task.status === "completed" ? (
+                              <CheckSquare className="w-5 h-5 text-green-500" />
+                            ) : task.status === "in-progress" ? (
+                              <Clock className="w-5 h-5 text-yellow-500" />
+                            ) : (
+                              <Square className="w-5 h-5 text-blue-500" />
+                            )}
+                          </div>
+                          <span className="text-sm font-mono text-muted-foreground">{task.id}</span>
+                          <div className={`w-3 h-3 rounded-full ${
+                            task.priority === 'critical' ? 'bg-red-500' :
+                            task.priority === 'high' ? 'bg-orange-500' :
+                            task.priority === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
+                          } mt-1`}></div>
+                          <h4 className="font-medium">{task.title}</h4>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className={
+                            task.status === "completed" ? "border-green-500 text-green-500" :
+                            task.status === "in-progress" ? "border-yellow-500 text-yellow-500" :
+                            task.status === "cancelled" ? "border-red-500 text-red-500" :
+                            "border-blue-500 text-blue-500"
+                          }>
+                            {task.status.replace('-', ' ')}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditTask(task)}
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {task.description && (
+                        <div className="mb-3 text-sm text-muted-foreground">
+                          {task.description}
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <span>Assigned to {task.assignee}</span>
                           <span>•</span>
-                          <span>Due {task.dueDate}</span>
+                          <span>Reporter: {task.reporter}</span>
+                          <span>•</span>
+                          <span>{new Date(task.createdAt).toLocaleDateString()}</span>
+                          {task.dueDate && (
+                            <>
+                              <span>•</span>
+                              <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
+                            </>
+                          )}
+                        </div>
+                        <div className="flex gap-1">
+                          {task.tags.map((tag, tagIndex) => (
+                            <Badge key={tagIndex} variant="secondary" className="text-xs">
+                              {tag}
+                            </Badge>
+                          ))}
                         </div>
                       </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <Badge variant="outline" className={getStatusColor(task.status)}>
-                        {task.status.replace('-', ' ')}
-                      </Badge>
-                      <div className="flex gap-1">
-                        {task.tags.map((tag, tagIndex) => (
-                          <Badge key={tagIndex} variant="secondary" className="text-xs">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
           </Card>
 
-          {/* P5 Task Automation */}
+          {/* P5 Automation Status */}
           <Card className="p-6 bg-gradient-card border-border/40">
             <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
               <Zap className="w-5 h-5 text-primary" />
-              P5 Task Automation
+              P5 Automation Status
             </h3>
             <div className="grid md:grid-cols-2 gap-6">
               <div className="space-y-4">
-                <div className="p-4 rounded-lg bg-background/20 border border-border/20">
-                  <h4 className="font-medium mb-2">Auto Task Generation</h4>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Automatically create tasks from commit messages and code comments
-                  </p>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-background/20">
+                  <span className="text-sm">Build Break Detection</span>
                   <span className="inline-block bg-green-500/20 text-green-500 px-2 py-1 text-xs rounded">Active</span>
                 </div>
-                <div className="p-4 rounded-lg bg-background/20 border border-border/20">
-                  <h4 className="font-medium mb-2">Progress Tracking</h4>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Track task completion based on code changes and PR merges
-                  </p>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-background/20">
+                  <span className="text-sm">Auto Test Runner</span>
+                  <span className="inline-block bg-green-500/20 text-green-500 px-2 py-1 text-xs rounded">Active</span>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-background/20">
+                  <span className="text-sm">Commit Validation</span>
                   <span className="inline-block bg-green-500/20 text-green-500 px-2 py-1 text-xs rounded">Active</span>
                 </div>
               </div>
               <div className="space-y-4">
-                <div className="p-4 rounded-lg bg-background/20 border border-border/20">
-                  <h4 className="font-medium mb-2">Deadline Notifications</h4>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Get notified when tasks are approaching their due dates
-                  </p>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-background/20">
+                  <span className="text-sm">Auto Bug Tagging</span>
                   <span className="inline-block bg-yellow-500/20 text-yellow-500 px-2 py-1 text-xs rounded">Pending</span>
                 </div>
-                <div className="p-4 rounded-lg bg-background/20 border border-border/20">
-                  <h4 className="font-medium mb-2">Workload Balancing</h4>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Suggest task assignments based on team member availability
-                  </p>
-                  <span className="inline-block bg-blue-500/20 text-blue-500 px-2 py-1 text-xs rounded">Coming Soon</span>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-background/20">
+                  <span className="text-sm">Performance Monitoring</span>
+                  <span className="inline-block bg-green-500/20 text-green-500 px-2 py-1 text-xs rounded">Active</span>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-background/20">
+                  <span className="text-sm">Automated Testing</span>
+                  <span className="inline-block bg-green-500/20 text-green-500 px-2 py-1 text-xs rounded">Active</span>
                 </div>
               </div>
             </div>
@@ -611,4 +768,3 @@ const Tasks = () => {
 };
 
 export default Tasks;
-

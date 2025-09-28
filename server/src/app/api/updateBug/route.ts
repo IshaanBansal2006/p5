@@ -16,59 +16,54 @@ interface Bug {
   checked: boolean;
 }
 
-interface Task {
-  id: string;
-  title: string;
-  description: string;
-  priority: 'low' | 'medium' | 'high' | 'critical';
-  status: 'todo' | 'in-progress' | 'completed' | 'cancelled';
-  assignee: string;
-  reporter: string;
-  dueDate: string;
-  createdAt: string;
-  updatedAt: string;
-  tags: string[];
-  comments: TaskComment[];
-  completed: boolean;
-  checked: boolean;
-}
-
-interface TaskComment {
-  id: string;
-  author: string;
-  content: string;
-  createdAt: string;
-}
-
 interface RepositoryData {
   bugs: Bug[];
-  tasks: Task[];
+  tasks: Array<{
+    id: string;
+    title: string;
+    description: string;
+    priority: string;
+    status: string;
+    assignee: string;
+    reporter: string;
+    dueDate: string;
+    createdAt: string;
+    updatedAt: string;
+    tags: string[];
+    comments: Array<{
+      id: string;
+      author: string;
+      content: string;
+      createdAt: string;
+    }>;
+    completed: boolean;
+    checked: boolean;
+  }>;
 }
 
 interface UpdateBugRequest {
   owner: string;
   repo: string;
   bugId: string;
-  status: 'open' | 'in-progress' | 'resolved' | 'closed';
+  title?: string;
+  description?: string;
+  severity?: 'low' | 'medium' | 'high' | 'critical';
+  status?: 'open' | 'in-progress' | 'resolved' | 'closed';
+  assignee?: string;
+  reporter?: string;
+  labels?: string[];
+  updatedAt?: string;
 }
 
 export async function PUT(request: NextRequest) {
   try {
     const body: UpdateBugRequest = await request.json();
-    const { owner, repo, bugId, status } = body;
+    const { owner, repo, bugId, ...updateData } = body;
 
     // Validate required parameters
-    if (!owner || !repo || !bugId || !status) {
+    if (!owner || !repo || !bugId) {
       return NextResponse.json(
-        { error: 'Missing required parameters: owner, repo, bugId, and status' },
-        { status: 400 }
-      );
-    }
-
-    // Validate status
-    if (!['open', 'in-progress', 'resolved', 'closed'].includes(status)) {
-      return NextResponse.json(
-        { error: 'Status must be one of: open, in-progress, resolved, closed' },
+        { error: 'Missing required parameters: owner, repo, and bugId' },
         { status: 400 }
       );
     }
@@ -87,7 +82,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const repositoryData: RepositoryData = JSON.parse(existingData);
-
+    
     // Find the bug to update
     const bugIndex = repositoryData.bugs.findIndex(bug => bug.id === bugId);
     
@@ -99,11 +94,10 @@ export async function PUT(request: NextRequest) {
     }
 
     // Update the bug
-    const currentTime = new Date().toISOString();
     const updatedBug = {
       ...repositoryData.bugs[bugIndex],
-      status,
-      updatedAt: currentTime
+      ...updateData,
+      updatedAt: updateData.updatedAt || new Date().toISOString()
     };
 
     repositoryData.bugs[bugIndex] = updatedBug;
@@ -113,7 +107,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json(
       {
-        message: `Successfully updated bug ${bugId} status to ${status}`,
+        message: `Successfully updated bug ${bugId}`,
         bug: updatedBug
       },
       { status: 200 }

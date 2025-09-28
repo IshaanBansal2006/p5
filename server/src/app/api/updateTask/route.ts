@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { redis } from '@/lib/redis';
 
 // Task interface definition
+interface TaskComment {
+  id: string;
+  author: string;
+  content: string;
+  createdAt: string;
+}
+
 interface Task {
   id: string;
   title: string;
@@ -19,28 +26,20 @@ interface Task {
   checked: boolean;
 }
 
-interface TaskComment {
-  id: string;
-  author: string;
-  content: string;
-  createdAt: string;
-}
-
-interface Bug {
-  id: string;
-  title: string;
-  description: string;
-  status: string;
-  priority: string;
-  assignee: string;
-  reporter: string;
-  createdAt: string;
-  updatedAt: string;
-  labels: string[];
-}
-
 interface RepositoryData {
-  bugs: Bug[];
+  bugs: Array<{
+    id: string;
+    title: string;
+    description: string;
+    severity: 'low' | 'medium' | 'high' | 'critical';
+    status: 'open' | 'in-progress' | 'resolved' | 'closed';
+    assignee: string;
+    reporter: string;
+    createdAt: string;
+    updatedAt: string;
+    labels: string[];
+    checked: boolean;
+  }>;
   tasks: Task[];
 }
 
@@ -48,26 +47,26 @@ interface UpdateTaskRequest {
   owner: string;
   repo: string;
   taskId: string;
-  status: 'todo' | 'in-progress' | 'completed' | 'cancelled';
+  title?: string;
+  description?: string;
+  priority?: 'low' | 'medium' | 'high' | 'critical';
+  status?: 'todo' | 'in-progress' | 'completed' | 'cancelled';
+  assignee?: string;
+  reporter?: string;
+  dueDate?: string;
+  tags?: string[];
+  updatedAt?: string;
 }
 
 export async function PUT(request: NextRequest) {
   try {
     const body: UpdateTaskRequest = await request.json();
-    const { owner, repo, taskId, status } = body;
+    const { owner, repo, taskId, ...updateData } = body;
 
     // Validate required parameters
-    if (!owner || !repo || !taskId || !status) {
+    if (!owner || !repo || !taskId) {
       return NextResponse.json(
-        { error: 'Missing required parameters: owner, repo, taskId, and status' },
-        { status: 400 }
-      );
-    }
-
-    // Validate status
-    if (!['todo', 'in-progress', 'completed', 'cancelled'].includes(status)) {
-      return NextResponse.json(
-        { error: 'Status must be one of: todo, in-progress, completed, cancelled' },
+        { error: 'Missing required parameters: owner, repo, and taskId' },
         { status: 400 }
       );
     }
@@ -86,7 +85,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const repositoryData: RepositoryData = JSON.parse(existingData);
-
+    
     // Find the task to update
     const taskIndex = repositoryData.tasks.findIndex(task => task.id === taskId);
     
@@ -98,12 +97,10 @@ export async function PUT(request: NextRequest) {
     }
 
     // Update the task
-    const currentTime = new Date().toISOString();
     const updatedTask = {
       ...repositoryData.tasks[taskIndex],
-      status,
-      completed: status === 'completed',
-      updatedAt: currentTime
+      ...updateData,
+      updatedAt: updateData.updatedAt || new Date().toISOString()
     };
 
     repositoryData.tasks[taskIndex] = updatedTask;
@@ -113,7 +110,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json(
       {
-        message: `Successfully updated task ${taskId} status to ${status}`,
+        message: `Successfully updated task ${taskId}`,
         task: updatedTask
       },
       { status: 200 }
