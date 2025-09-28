@@ -2,7 +2,7 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { GitCommitVertical as GitCommit, Users, Clock, TrendingUp, GitBranch, Star, Trophy, Award, GitMerge, Loader2, Minus, Github } from "lucide-react";
+import { GitCommitVertical as GitCommit, Users, Clock, GitBranch, Star, Trophy, Award, GitMerge, Loader2, Github } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -11,10 +11,10 @@ import RepoLayout from "@/components/RepoLayout";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface StatsData {
-  branches: { current: number; percentChange: number };
-  totalCommits: { current: number; percentChange: number };
-  totalContributors: { current: number; percentChange: number };
-  totalLinesOfCode: { current: number; percentChange: number };
+  branches: { current: number };
+  totalCommits: { current: number };
+  totalContributors: { current: number };
+  totalLinesOfCode: { current: number };
   commitsAnalyzed: number;
 }
 
@@ -98,20 +98,6 @@ const RepoStats = () => {
     }
   }, [owner, repo]);
 
-  const formatChange = (percentChange: number) => {
-    const sign = percentChange >= 0 ? '+' : '';
-    return `${sign}${percentChange.toFixed(1)}% last 12h`;
-  };
-
-  const getChangeIcon = (percentChange: number) => {
-    if (percentChange === 0) return Minus;
-    return TrendingUp;
-  };
-
-  const getChangeColor = (percentChange: number) => {
-    if (percentChange === 0) return 'text-gray-500';
-    return 'text-green-500';
-  };
 
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
@@ -164,34 +150,22 @@ const RepoStats = () => {
     { 
       icon: GitCommit, 
       label: "Total Commits", 
-      value: statsData.stats?.totalCommits?.current?.toString() || "0", 
-      change: formatChange(statsData.stats?.totalCommits?.percentChange || 0),
-      changeIcon: getChangeIcon(statsData.stats?.totalCommits?.percentChange || 0),
-      changeColor: getChangeColor(statsData.stats?.totalCommits?.percentChange || 0)
+      value: statsData.stats?.totalCommits?.current?.toString() || "0"
     },
     { 
       icon: Users, 
       label: "Contributors", 
-      value: statsData.stats?.totalContributors?.current?.toString() || "0", 
-      change: formatChange(statsData.stats?.totalContributors?.percentChange || 0),
-      changeIcon: getChangeIcon(statsData.stats?.totalContributors?.percentChange || 0),
-      changeColor: getChangeColor(statsData.stats?.totalContributors?.percentChange || 0)
+      value: statsData.stats?.totalContributors?.current?.toString() || "0"
     },
     { 
       icon: GitBranch, 
       label: "Branches", 
-      value: statsData.stats?.branches?.current?.toString() || "0", 
-      change: formatChange(statsData.stats?.branches?.percentChange || 0),
-      changeIcon: getChangeIcon(statsData.stats?.branches?.percentChange || 0),
-      changeColor: getChangeColor(statsData.stats?.branches?.percentChange || 0)
+      value: statsData.stats?.branches?.current?.toString() || "0"
     },
     { 
       icon: Star, 
       label: "Lines of Code", 
-      value: statsData.stats?.totalLinesOfCode?.current?.toString() || "0", 
-      change: formatChange(statsData.stats?.totalLinesOfCode?.percentChange || 0),
-      changeIcon: getChangeIcon(statsData.stats?.totalLinesOfCode?.percentChange || 0),
-      changeColor: getChangeColor(statsData.stats?.totalLinesOfCode?.percentChange || 0)
+      value: statsData.stats?.totalLinesOfCode?.current?.toString() || "0"
     },
   ];
 
@@ -295,16 +269,14 @@ const RepoStats = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {stats.map((stat, index) => (
               <Card key={index} className="p-6 bg-gradient-card border-border/40 hover:border-primary/20 transition-smooth">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center mb-4">
                   <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
                     <stat.icon className="w-5 h-5 text-primary" />
                   </div>
-                  <stat.changeIcon className={`w-4 h-4 ${stat.changeColor}`} />
                 </div>
                 <div className="space-y-1">
                   <p className="text-2xl font-bold">{stat.value}</p>
                   <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
-                  <p className={`text-xs ${stat.changeColor}`}>{stat.change}</p>
                 </div>
               </Card>
             ))}
@@ -314,7 +286,7 @@ const RepoStats = () => {
           {timeSeriesData.length > 0 && (
             <Card className="p-6 bg-gradient-card border-border/40">
               <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-primary" />
+                <Star className="w-5 h-5 text-primary" />
                 Total Lines of Code Over Commits
               </h3>
               <div className="h-64 bg-background/10 rounded-lg p-4">

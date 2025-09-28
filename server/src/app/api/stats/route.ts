@@ -49,10 +49,10 @@ interface Awards {
 }
 
 interface StatsData {
-  branches: { current: number; percentChange: number };
-  totalCommits: { current: number; percentChange: number };
-  totalContributors: { current: number; percentChange: number };
-  totalLinesOfCode: { current: number; percentChange: number };
+  branches: { current: number };
+  totalCommits: { current: number };
+  totalContributors: { current: number };
+  totalLinesOfCode: { current: number };
   commitsAnalyzed: number;
 }
 
@@ -222,7 +222,10 @@ export async function GET(request: NextRequest) {
     // Sort commits by date (oldest first) for cumulative calculation - create a copy to avoid mutating original
     const sortedCommits = [...detailedCommits].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     
-    for (const commit of sortedCommits) {
+    // Limit to first 50 commits to match what the graph should show
+    const limitedCommits = sortedCommits.slice(0, 50);
+    
+    for (const commit of limitedCommits) {
       timeSeriesData.push({
         date: commit.date,
         commits: 1,
@@ -350,20 +353,12 @@ export async function GET(request: NextRequest) {
         curr.commits < min.commits ? curr : min, contributorStats[0] || { name: 'None', commits: 0 })
     };
 
-    // Calculate total lines of code from GitHub languages API
-    let totalLinesOfCode = 0;
-    if (languages.data && typeof languages.data === 'object') {
-      totalLinesOfCode = Object.values(languages.data).reduce((total, lines) => {
-        const numLines = typeof lines === 'number' ? lines : 0;
-        return total + numLines;
-      }, 0);
-    } else {
-      console.error('Languages data is not valid, falling back to commit-based calculation:', languages.data);
-      // Fallback to old calculation if languages API fails
-      totalLinesOfCode = detailedCommits.reduce((total, commit) => {
-        return total + commit.additions - commit.deletions;
-      }, 0);
-    }
+    // Calculate total lines of code to match the graph (cumulative from time series)
+    // This should match what's shown in the graph - the cumulative lines of code at the end
+    // Calculate the same way as the frontend does for the last data point
+    const totalLinesOfCode = timeSeriesData.length > 0 
+      ? timeSeriesData.reduce((cumSum, d) => cumSum + d.linesAdded - d.linesDeleted, 0)
+      : 0;
 
     // Calculate current stats
     const currentStats = {
@@ -373,63 +368,23 @@ export async function GET(request: NextRequest) {
       totalLinesOfCode: Math.max(totalLinesOfCode, 0) // Ensure non-negative
     };
 
-    // Get historical data for percent change calculation (12 hours ago vs now)
-    const historicalData = await redis.get(historicalKey);
-    let percentChanges = {
-      branches: 0,
-      totalCommits: 0,
-      totalContributors: 0,
-      totalLinesOfCode: 0
-    };
-
-    if (historicalData) {
-      try {
-        const historical = JSON.parse(historicalData);
-        const twelveHoursAgo = new Date();
-        twelveHoursAgo.setHours(twelveHoursAgo.getHours() - 12);
-      
-        if (new Date(historical.timestamp) >= twelveHoursAgo) {
-          percentChanges = {
-            branches: calculatePercentChange(historical.branches, currentStats.branches),
-            totalCommits: calculatePercentChange(historical.totalCommits, currentStats.totalCommits),
-            totalContributors: calculatePercentChange(historical.totalContributors, currentStats.totalContributors),
-            totalLinesOfCode: calculatePercentChange(historical.totalLinesOfCode, currentStats.totalLinesOfCode)
-          };
-        }
-      } catch (error) {
-        console.warn('Failed to parse historical data, clearing corrupted cache and using default percent changes:', error);
-        console.warn('Historical data content:', historicalData?.substring(0, 100) + '...');
-        
-        // Clear corrupted historical data
-        try {
-          await redis.del(historicalKey);
-        } catch (delError) {
-          console.warn('Failed to clear corrupted historical cache:', delError);
-        }
-      }
-    }
-
-    // Store current stats for future percent change calculations
+    // Store current stats for future reference (no percentage calculation)
     try {
       const historicalData = {
         ...currentStats,
         timestamp: new Date().toISOString()
       };
       const historicalJson = JSON.stringify(historicalData);
-      // Validate that we can parse it back
-      JSON.parse(historicalJson);
-      
       await redis.set(historicalKey, historicalJson, { EX: 86400 }); // Expire after 24 hours
     } catch (error) {
-      console.error('Failed to serialize historical data for caching:', error);
-      // Continue without caching if serialization fails
+      console.error('Failed to store historical data:', error);
     }
 
     const stats: StatsData = {
-      branches: { current: currentStats.branches, percentChange: percentChanges.branches },
-      totalCommits: { current: currentStats.totalCommits, percentChange: percentChanges.totalCommits },
-      totalContributors: { current: currentStats.totalContributors, percentChange: percentChanges.totalContributors },
-      totalLinesOfCode: { current: currentStats.totalLinesOfCode, percentChange: percentChanges.totalLinesOfCode },
+      branches: { current: currentStats.branches },
+      totalCommits: { current: currentStats.totalCommits },
+      totalContributors: { current: currentStats.totalContributors },
+      totalLinesOfCode: { current: currentStats.totalLinesOfCode },
       commitsAnalyzed: Math.min(100, detailedCommits.length)
     };
 
@@ -484,7 +439,3 @@ export async function GET(request: NextRequest) {
   }
 }
 
-function calculatePercentChange(oldValue: number, newValue: number): number {
-  if (oldValue === 0) return newValue > 0 ? 100 : 0;
-  return Math.round(((newValue - oldValue) / oldValue) * 100 * 100) / 100; // Round to 2 decimal places
-}
