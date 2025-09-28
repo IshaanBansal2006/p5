@@ -1,34 +1,49 @@
+'use client';
+
 import { Button } from "@/components/ui/button";
-import { Terminal, Zap, Shield, FileText, Eye, Github } from "lucide-react";
+import { Terminal, Zap, Settings, FileText, BarChart3, Github, Copy, Check } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { useState } from "react";
+
 
 const Home = () => {
+  const [copied, setCopied] = useState(false);
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText('npm i player5');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy: ', err);
+    }
+  };
   const features = [
     {
       icon: Terminal,
-      title: "Local Build Testing",
-      description: "Run p5 test to quickly check if your project builds and basic tests pass locally. Clear error reporting saves time.",
+      title: "Multi-Stage Testing",
+      description: "Run comprehensive tests with p5 test for pre-commit, pre-push, and CI stages. Includes linting, build checks, and website testing with Puppeteer.",
     },
     {
-      icon: Shield,
-      title: "Commit Break Alerts",
-      description: "Get warned before pushing bad commits. Auto-flags breaking commits and tags responsible developers on GitHub.",
+      icon: Settings,
+      title: "Project Initialization",
+      description: "One-command setup with p5 init. Configures git hooks, GitHub workflows, npm scripts, and registers your project with the dashboard.",
     },
     {
       icon: FileText,
-      title: "Auto-Updating README",
-      description: "Keep build status, recent commits, and contributors automatically updated. No more forgetting during crunch time.",
+      title: "AI-Generated README",
+      description: "Auto-generate professional READMEs with p5 readme sync. Analyzes your codebase and creates comprehensive documentation with tech stack and features.",
     },
     {
       icon: Zap,
-      title: "One-Command Devpost",
-      description: "Generate ready-to-upload Devpost drafts with p5 devpost gen. Automatically fills sections based on your project.",
+      title: "Devpost Generation",
+      description: "Generate hackathon-ready Devpost submissions with p5 devpost gen. AI analyzes your project and creates compelling project descriptions.",
     },
     {
-      icon: Eye,
-      title: "Playwright Test Wizard",
-      description: "Click through your app to create Playwright tests automatically. No more writing long test scripts manually.",
+      icon: BarChart3,
+      title: "Repository Dashboard",
+      description: "View comprehensive project analytics with p5 dashboard. Track commits, contributors, bugs, and tasks in a beautiful web interface.",
     },
   ];
 
@@ -77,27 +92,35 @@ const Home = () => {
         </div>
         <div className="relative container mx-auto px-6 text-center">
           <div className="max-w-4xl mx-auto">
-            <h1 className="text-5xl lg:text-7xl font-bold mb-6 bg-gradient-primary bg-clip-text text-transparent">
-              Streamline Your<br />Hackathon Development
+            <h1 className="text-5xl lg:text-7xl font-bold mb-6 text-white">
+              Have no fear,<br /><span className="bg-gradient-primary bg-clip-text text-transparent">Player 5</span> is here.
             </h1>
             <p className="text-xl lg:text-2xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-              P5 automates the annoying parts of development: build testing, README updates,
-              devpost generation, and more. Focus on building, not the boring stuff.
+              Add a fifth player to your dev team to automate the tedious aspects of the hackathon development process.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="flex flex-col items-center gap-6">
+              {/* Code Block */}
+              <div className="relative flex items-center justify-center gap-3 bg-gradient-card rounded-lg px-4 py-3 w-full max-w-md">
+                <code className="text-white font-mono text-lg" style={{ fontFamily: 'Fira Code, monospace' }}>
+                  npm i <span className="font-black bg-gradient-primary bg-clip-text text-transparent">player5</span>
+                </code>
+                <button
+                  onClick={copyToClipboard}
+                  className="absolute right-2 p-2 text-gray-400 hover:text-white transition-colors"
+                >
+                  {copied ? (
+                    <Check className="w-4 h-4" />
+                  ) : (
+                    <Copy className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+
+              {/* Get Started Button */}
               <Link href="/documentation#get-started">
-                <Button variant="hero" size="lg" className="text-lg px-8 py-4">
+                <Button variant="hero" size="lg" className="text-lg px-8 py-4 transition-all duration-300">
                   <Terminal className="w-5 h-5" />
                   Get Started
-                </Button>
-              </Link>
-              <Button variant="outline" size="lg" className="text-lg px-8 py-4">
-                <Terminal className="w-5 h-5" />
-                npm install -g p5
-              </Button>
-              <Link href="/documentation">
-                <Button variant="outline" size="lg" className="text-lg px-8 py-4">
-                  View Documentation
                 </Button>
               </Link>
             </div>
