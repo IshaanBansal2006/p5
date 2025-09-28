@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { ChartBar as BarChart3, Bug, SquareCheck as CheckSquare, Github, Star, GitFork } from "lucide-react";
+import { ChartBar as BarChart3, Bug, SquareCheck as CheckSquare, Github, Star, GitFork, Play } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
 
@@ -84,6 +84,7 @@ const RepoLayout = ({ children }: RepoLayoutProps) => {
     { id: "stats", label: "Stats", icon: BarChart3, path: `/${owner}/${repo}` },
     { id: "bugs", label: "Issues", icon: Bug, path: `/${owner}/${repo}/bugs` },
     { id: "tasks", label: "Tasks", icon: CheckSquare, path: `/${owner}/${repo}/tasks` },
+    { id: "tests", label: "Tests", icon: Play, path: `/${owner}/${repo}/tests` },
   ];
 
   const currentTab = tabs.find(tab => pathname === tab.path) || tabs[0];

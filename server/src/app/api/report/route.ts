@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { redis } from '@/lib/redis';
 
 // Types for the incoming data structure
 interface DetailedError {
@@ -163,7 +164,7 @@ RESPONSE FORMAT (JSON only, no markdown):
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
-    
+
     // Parse Gemini's response
     let geminiResult;
     try {
@@ -191,7 +192,7 @@ RESPONSE FORMAT (JSON only, no markdown):
       errorType: string;
     }, index: number) => {
       const now = new Date().toISOString();
-      
+
       // Create a comprehensive description that includes the suggested fix
       let fullDescription = error.description;
       if (error.suggestedFix) {
@@ -206,7 +207,7 @@ RESPONSE FORMAT (JSON only, no markdown):
       if (error.occurrences > 1) {
         fullDescription += `\n\nThis issue occurs ${error.occurrences} times.`;
       }
-      
+
       return {
         id: '', // Will be assigned by addBug endpoint
         title: error.title,
@@ -214,7 +215,7 @@ RESPONSE FORMAT (JSON only, no markdown):
         severity: error.severity as 'low' | 'medium' | 'high' | 'critical',
         status: 'open',
         assignee: 'unassigned',
-        reporter: 'system',
+        reporter: 'p5testing',
         createdAt: now,
         updatedAt: now,
         labels: error.labels || [],
@@ -223,24 +224,24 @@ RESPONSE FORMAT (JSON only, no markdown):
     });
 
     console.log(`Processed ${errors.length} errors into ${processedBugs.length} unique bugs`);
-    
+
     // Log summary of processed bugs by severity
     const severityCounts = processedBugs.reduce((acc, bug) => {
       acc[bug.severity] = (acc[bug.severity] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
-    
+
     console.log('Severity breakdown:', severityCounts);
-    
+
     return processedBugs;
 
   } catch (error) {
     console.error('Error processing with Gemini:', error);
-    
+
     // Fallback: basic deduplication without AI
     const uniqueBugs = errors.reduce((acc: Bug[], curr, index) => {
-      const existing = acc.find(bug => 
-        bug.description.includes(curr.message) && 
+      const existing = acc.find(bug =>
+        bug.description.includes(curr.message) &&
         bug.title.includes(curr.taskName)
       );
 
@@ -249,21 +250,21 @@ RESPONSE FORMAT (JSON only, no markdown):
         const occurrenceMatch = existing.description.match(/This issue occurs (\d+) times/);
         const currentCount = occurrenceMatch ? parseInt(occurrenceMatch[1]) : 1;
         existing.description = existing.description.replace(
-          /This issue occurs \d+ times/, 
+          /This issue occurs \d+ times/,
           `This issue occurs ${currentCount + 1} times`
         );
         existing.updatedAt = new Date().toISOString();
       } else {
         // Map original severity to our severity scale
         const severity = mapSeverityToBugSeverity(curr.severity, curr.taskName, curr.errorType);
-        
+
         const now = new Date().toISOString();
-        
+
         // Create a better title from the error message
-        const title = curr.message.length > 60 
+        const title = curr.message.length > 60
           ? `${curr.taskName} Error: ${curr.message.substring(0, 60)}...`
           : `${curr.taskName} Error: ${curr.message}`;
-        
+
         // Create a comprehensive description
         let description = `Error in ${curr.taskName}: ${curr.message}`;
         if (curr.location?.file) {
@@ -273,7 +274,7 @@ RESPONSE FORMAT (JSON only, no markdown):
           }
         }
         description += `\n\nThis error was detected during the ${curr.taskName} phase of the build process.`;
-        
+
         // Generate appropriate labels
         const labels = [curr.taskName, curr.errorType];
         if (curr.location?.file) {
@@ -282,7 +283,7 @@ RESPONSE FORMAT (JSON only, no markdown):
             labels.push('javascript', 'typescript');
           }
         }
-        
+
         acc.push({
           id: '', // Will be assigned by addBug endpoint
           title: title,
@@ -308,8 +309,8 @@ RESPONSE FORMAT (JSON only, no markdown):
 
 // Helper function to map original severity to bug severity scale
 function mapSeverityToBugSeverity(
-  originalSeverity: 'error' | 'warning', 
-  taskName: string, 
+  originalSeverity: 'error' | 'warning',
+  taskName: string,
   errorType: string
 ): 'low' | 'medium' | 'high' | 'critical' {
   // High priority conditions
@@ -329,7 +330,7 @@ function mapSeverityToBugSeverity(
   if (originalSeverity === 'error' && taskName === 'lint') {
     return 'medium'; // Linting errors are medium priority
   }
-  
+
   if (originalSeverity === 'warning') {
     if (taskName === 'typecheck' || taskName === 'build') {
       return 'medium'; // Build/type warnings can indicate future issues
@@ -379,7 +380,7 @@ async function addBugsViaAPI(owner: string, repo: string, bugs: Bug[]): Promise<
     }
 
     const addBugResult = await addBugResponse.json();
-    
+
     // Return the bugs with their new sequential IDs
     return {
       success: true,
@@ -403,7 +404,7 @@ export async function POST(request: NextRequest) {
   try {
     // Validate request body
     const errorCollection: ErrorCollection = await request.json();
-    
+
     if (!errorCollection.repository?.owner || !errorCollection.repository?.repo) {
       return NextResponse.json(
         { error: 'Missing repository owner or repo name' },
@@ -419,7 +420,51 @@ export async function POST(request: NextRequest) {
     }
 
     const { owner, repo } = errorCollection.repository;
+
+    // Store test execution data in Redis
+    const testExecutionData = {
+      id: `test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      repository: { owner, repo },
+      executedAt: new Date().toISOString(),
+      totalErrors: errorCollection.totalErrors,
+      totalWarnings: errorCollection.totalWarnings,
+      totalDuration: errorCollection.totalDuration,
+      stage: errorCollection.stage,
+      sessionId: errorCollection.sessionId,
+      errors: errorCollection.errors.map(error => ({
+        taskName: error.taskName,
+        errorType: error.errorType,
+        severity: error.severity,
+        message: error.message,
+        location: error.location,
+        timestamp: error.timestamp,
+        duration: error.duration,
+        rawOutput: error.rawOutput
+      })),
+      summary: errorCollection.summary
+    };
+
+    // Store in Redis with a key pattern: test_executions:{owner}:{repo}:{timestamp}
+    const redisKey = `test_executions:${owner}:${repo}:${testExecutionData.id}`;
+    await redis.set(redisKey, JSON.stringify(testExecutionData));
+
+    // Also store in a list for easy retrieval of all test executions for a repo
+    const listKey = `test_executions_list:${owner}:${repo}`;
+    const existingList = await redis.get(listKey);
+    const testExecutions = existingList ? JSON.parse(existingList) : [];
+    testExecutions.push({
+      id: testExecutionData.id,
+      executedAt: testExecutionData.executedAt,
+      totalErrors: testExecutionData.totalErrors,
+      totalWarnings: testExecutionData.totalWarnings,
+      totalDuration: testExecutionData.totalDuration,
+      stage: testExecutionData.stage
+    });
     
+    // Keep only the last 50 test executions to prevent unlimited growth
+    const trimmedExecutions = testExecutions.slice(-50);
+    await redis.set(listKey, JSON.stringify(trimmedExecutions));
+
     console.log(`Processing ${errorCollection.errors.length} errors for ${owner}/${repo}`);
 
     // Log all the non-unique errors before processing
@@ -436,7 +481,7 @@ export async function POST(request: NextRequest) {
 
     // Step 1: Process errors with Gemini AI
     const processedBugs = await processErrorsWithGemini(errorCollection.errors);
-    
+
     // Log the unique processed bugs
     console.log('\n=== PROCESSED UNIQUE BUGS ===');
     processedBugs.forEach((bug, index) => {
@@ -451,17 +496,17 @@ export async function POST(request: NextRequest) {
 
     // Step 2: Add bugs via addBug API to ensure consistent numbering
     const addBugResult = await addBugsViaAPI(owner, repo, processedBugs);
-    
+
     if (!addBugResult.success) {
       return NextResponse.json(
-        { 
+        {
           error: 'Failed to add bugs to repository',
           details: addBugResult.error
         },
         { status: 500 }
       );
     }
-    
+
     // Log results
     console.log(`=== BUG ADDITION RESULTS ===`);
     console.log(`Processed unique bugs: ${processedBugs.length}`);
@@ -483,11 +528,11 @@ export async function POST(request: NextRequest) {
     ];
 
     const suggestions = [];
-    
+
     if (criticalBugs.length > 0) {
       suggestions.push(`🚨 Address ${criticalBugs.length} critical issues immediately`);
     }
-    
+
     if (highPriorityBugs.length > 0) {
       suggestions.push(`❗ Address ${highPriorityBugs.length} high-priority issues first`);
     }
@@ -533,9 +578,9 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Error in report handler:', error);
-    
+
     return NextResponse.json(
-      { 
+      {
         error: 'Internal server error',
         message: error instanceof Error ? error.message : 'Unknown error'
       },
@@ -572,7 +617,7 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await addBugResponse.json();
-    
+
     return NextResponse.json({
       repository: { owner, repo },
       totalBugs: data.totalBugs || 0,
@@ -582,7 +627,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error in GET handler:', error);
     return NextResponse.json(
-      { 
+      {
         error: 'Internal server error',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
