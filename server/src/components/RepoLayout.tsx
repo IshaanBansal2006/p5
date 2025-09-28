@@ -14,6 +14,7 @@ interface RepoLayoutProps {
 interface RepoData {
   stargazers_count: number;
   forks_count: number;
+  description: string | null;
 }
 
 const RepoLayout = ({ children }: RepoLayoutProps) => {
@@ -21,10 +22,12 @@ const RepoLayout = ({ children }: RepoLayoutProps) => {
   const pathname = usePathname();
   const { owner, repo } = params;
   const [repoData, setRepoData] = useState<RepoData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchRepoData = async () => {
       try {
+        setIsLoading(true);
         const response = await fetch(`/api/repo-info?owner=${owner}&repo=${repo}`);
         if (response.ok) {
           const data = await response.json();
@@ -32,6 +35,8 @@ const RepoLayout = ({ children }: RepoLayoutProps) => {
         }
       } catch (error) {
         console.error('Failed to fetch repo data:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -86,7 +91,7 @@ const RepoLayout = ({ children }: RepoLayoutProps) => {
                   <span className="text-foreground"> / {repo}</span>
                 </h1>
                 <p className="text-muted-foreground">
-                  A hackathon project powered by P5 automation
+                  {isLoading ? 'Loading description...' : (repoData?.description || 'No description provided')}
                 </p>
                 <div className="flex items-center gap-4 mt-3">
                   <div className="flex items-center gap-1">

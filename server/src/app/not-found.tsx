@@ -80,7 +80,7 @@ export default function NotFound() {
                 </p>
                 <div className="bg-background/20 rounded-lg p-4 border border-border/20">
                   <code className="text-primary font-mono">
-                    cd your-repo && p5 init
+                    cd your-repo && npx p5 init
                   </code>
                 </div>
               </div>
