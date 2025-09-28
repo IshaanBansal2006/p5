@@ -19,15 +19,15 @@ import { ContributorDisplay } from "@/components/ui/contributor-display";
 interface Bug {
   id: string;
   title: string;
-  description: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
-  status: 'open' | 'in-progress' | 'resolved' | 'closed';
-  assignee: string;
-  reporter: string;
+  description?: string;
+  severity?: 'low' | 'medium' | 'high' | 'critical';
+  status?: 'open' | 'in-progress' | 'resolved' | 'closed';
+  assignee?: string;
+  reporter?: string;
   createdAt: string;
   updatedAt: string;
-  labels: string[];
-  checked: boolean;
+  labels?: string[];
+  checked?: boolean;
 }
 
 const RepoBugs = () => {
@@ -93,12 +93,12 @@ const RepoBugs = () => {
 
   const bugStats = [
     { icon: Bug, label: "Total Issues", value: bugs.length.toString(), color: "text-red-500" },
-    { icon: AlertCircle, label: "Critical", value: bugs.filter(b => b.severity === "critical").length.toString(), color: "text-red-600" },
-    { icon: Clock, label: "In Progress", value: bugs.filter(b => b.status === "in-progress").length.toString(), color: "text-yellow-500" },
-    { icon: CheckCircle, label: "Resolved", value: bugs.filter(b => b.status === "resolved").length.toString(), color: "text-green-500" },
+    { icon: AlertCircle, label: "Critical", value: bugs.filter(b => (b.severity || 'medium') === "critical").length.toString(), color: "text-red-600" },
+    { icon: Clock, label: "In Progress", value: bugs.filter(b => (b.status || 'open') === "in-progress").length.toString(), color: "text-yellow-500" },
+    { icon: CheckCircle, label: "Resolved", value: bugs.filter(b => (b.status || 'open') === "resolved").length.toString(), color: "text-green-500" },
   ];
 
-  const getSeverityColor = (severity: string) => {
+  const getSeverityColor = (severity: string | undefined) => {
     switch (severity) {
       case "critical": return "bg-red-500";
       case "high": return "bg-orange-500";
@@ -108,7 +108,7 @@ const RepoBugs = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string | undefined) => {
     switch (status) {
       case "open": return "border-red-500 text-red-500";
       case "in-progress": return "border-yellow-500 text-yellow-500";
@@ -118,7 +118,7 @@ const RepoBugs = () => {
     }
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: string | undefined) => {
     switch (status) {
       case "resolved":
         return <CheckCircle className="w-5 h-5 text-green-500" />;
@@ -150,7 +150,7 @@ const RepoBugs = () => {
             severity: newBugData.severity,
             status: "open",
             assignee: newBugData.assignee || "unassigned",
-            reporter: newBugData.reporter || "current_user",
+            reporter: newBugData.reporter || "unassigned",
             labels: newBugData.labels ? newBugData.labels.split(',').map(l => l.trim()) : []
           }]
         })
@@ -186,12 +186,12 @@ const RepoBugs = () => {
     setEditingBug(bug.id);
     setEditBugData({
       title: bug.title,
-      description: bug.description,
-      severity: bug.severity,
-      status: bug.status,
-      assignee: bug.assignee,
-      reporter: bug.reporter,
-      labels: bug.labels
+      description: bug.description || '',
+      severity: bug.severity || 'medium',
+      status: bug.status || 'open',
+      assignee: bug.assignee || 'unassigned',
+      reporter: bug.reporter || 'unassigned',
+      labels: bug.labels || []
     });
   };
 
@@ -290,7 +290,7 @@ const RepoBugs = () => {
 
     let newStatus: 'open' | 'in-progress' | 'resolved' | 'closed';
     
-    switch (currentBug.status) {
+    switch (currentBug.status || 'open') {
       case "open":
         newStatus = "in-progress";
         break;
@@ -348,22 +348,22 @@ const RepoBugs = () => {
   };
 
   const filteredBugs = bugs.filter(bug => {
-    if (filterPriority !== "all" && bug.severity !== filterPriority) return false;
-    if (filterStatus !== "all" && bug.status !== filterStatus) return false;
-    if (filterAssignee !== "all" && bug.assignee !== filterAssignee) return false;
-    if (hideResolved && (bug.status === "resolved" || bug.status === "closed")) return false;
+    if (filterPriority !== "all" && (bug.severity || 'medium') !== filterPriority) return false;
+    if (filterStatus !== "all" && (bug.status || 'open') !== filterStatus) return false;
+    if (filterAssignee !== "all" && (bug.assignee || 'unassigned') !== filterAssignee) return false;
+    if (hideResolved && ((bug.status || 'open') === "resolved" || (bug.status || 'open') === "closed")) return false;
     return true;
   }).sort((a, b) => {
     if (sortBy === "newest") return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     if (sortBy === "oldest") return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     if (sortBy === "priority") {
       const priorityOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
-      return (priorityOrder[b.severity] || 0) - (priorityOrder[a.severity] || 0);
+      return (priorityOrder[b.severity || 'medium'] || 0) - (priorityOrder[a.severity || 'medium'] || 0);
     }
     return 0;
   });
 
-  const assignees = [...new Set(bugs.map(bug => bug.assignee))];
+  const assignees = [...new Set(bugs.map(bug => bug.assignee || 'unassigned'))];
 
   if (loading) {
     return (
@@ -618,7 +618,7 @@ const RepoBugs = () => {
             <div className="space-y-4">
               {filteredBugs.map((bug, index) => (
                 <div key={index} className={`p-4 rounded-lg bg-background/20 border border-border/20 hover:border-primary/20 transition-smooth ${
-                  bug.status === "resolved" || bug.status === "closed" ? "opacity-60" : ""
+                  (bug.status === "resolved" || bug.status === "closed") ? "opacity-60" : ""
                 }`}>
                   {editingBug === bug.id ? (
                     // Edit Mode
@@ -741,13 +741,13 @@ const RepoBugs = () => {
                           </div>
                           <span className="text-sm font-mono text-muted-foreground">{bug.id}</span>
                           <div className={`w-3 h-3 rounded-full ${getSeverityColor(bug.severity)} mt-1`}></div>
-                          <h4 className={`font-medium ${bug.status === "resolved" || bug.status === "closed" ? "line-through" : ""}`}>
+                          <h4 className={`font-medium ${(bug.status === "resolved" || bug.status === "closed") ? "line-through" : ""}`}>
                             {bug.title}
                           </h4>
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className={getStatusColor(bug.status)}>
-                            {bug.status.replace('-', ' ')}
+                            {(bug.status || 'open').replace('-', ' ')}
                           </Badge>
                           <Button
                             variant="ghost"
@@ -760,13 +760,13 @@ const RepoBugs = () => {
                       </div>
 
                       {bug.description && bug.description.trim() !== ' ' && (
-                        <div className={`mb-3 text-sm text-muted-foreground ${bug.status === "resolved" || bug.status === "closed" ? "line-through" : ""}`}>
+                        <div className={`mb-3 text-sm text-muted-foreground ${(bug.status === "resolved" || bug.status === "closed") ? "line-through" : ""}`}>
                           {bug.description}
                         </div>
                       )}
 
                       <div className="flex items-center justify-between">
-                        <div className={`flex items-center gap-4 text-sm text-muted-foreground ${bug.status === "resolved" || bug.status === "closed" ? "line-through" : ""}`}>
+                        <div className={`flex items-center gap-4 text-sm text-muted-foreground ${(bug.status === "resolved" || bug.status === "closed") ? "line-through" : ""}`}>
                           <div className="flex items-center gap-2">
                             <span className="text-muted-foreground font-medium">Reported by</span>
                             <ContributorDisplay
@@ -788,8 +788,8 @@ const RepoBugs = () => {
                           <span className="text-foreground/80">{new Date(bug.createdAt).toLocaleDateString()}</span>
                         </div>
                         <div className="flex gap-1">
-                          {bug.labels.map((label, labelIndex) => (
-                            <Badge key={labelIndex} variant="secondary" className={`text-xs ${bug.status === "resolved" || bug.status === "closed" ? "opacity-60" : ""}`}>
+                          {(bug.labels || []).map((label, labelIndex) => (
+                            <Badge key={labelIndex} variant="secondary" className={`text-xs ${(bug.status === "resolved" || bug.status === "closed") ? "opacity-60" : ""}`}>
                               {label}
                             </Badge>
                           ))}
