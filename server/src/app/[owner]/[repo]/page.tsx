@@ -1,12 +1,12 @@
 'use client';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { GitCommitVertical as GitCommit, Users, Clock, TrendingUp, GitBranch, Star, Trophy, Award, GitMerge, Loader2, Minus, Github } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import RepoLayout from "@/components/RepoLayout";
 
 interface StatsData {
@@ -42,6 +42,7 @@ interface ContributorStats {
   deletions: number;
   branches: number;
   merges: number;
+  avatar_url?: string;
 }
 
 interface Awards {
@@ -57,6 +58,7 @@ interface StatsResponse {
   timeSeriesData: TimeSeriesData[];
   awards: Awards;
   stats: StatsData;
+  contributorStats: ContributorStats[];
   generatedAt: string;
 }
 
@@ -210,28 +212,21 @@ const RepoStats = () => {
     status: getCommitStatus(commit),
     hash: commit.sha.substring(0, 7),
     fullHash: commit.sha,
-    date: commit.date
+    date: commit.date,
+    additions: commit.additions,
+    deletions: commit.deletions
   }));
 
-  // Process contributors
-  const contributors = statsData.recentCommitHistory
-    .reduce((acc, commit) => {
-      const existing = acc.find(c => c.name === commit.author);
-      if (existing) {
-        existing.commits += 1;
-        existing.linesAdded += commit.additions;
-        existing.linesRemoved += commit.deletions;
-      } else {
-        acc.push({
-          name: commit.author,
-          commits: 1,
-          avatar: commit.author.charAt(0).toUpperCase(),
-          linesAdded: commit.additions,
-          linesRemoved: commit.deletions
-        });
-      }
-      return acc;
-    }, [] as Array<{ name: string; commits: number; avatar: string; linesAdded: number; linesRemoved: number }>)
+  // Process contributors - use the contributor stats from the API which includes avatar URLs
+  const contributors = statsData.contributorStats
+    .map(contributor => ({
+      name: contributor.name,
+      commits: contributor.commits,
+      avatar: contributor.name.charAt(0).toUpperCase(), // Fallback to first letter
+      avatar_url: contributor.avatar_url,
+      linesAdded: contributor.additions,
+      linesRemoved: contributor.deletions
+    }))
     .sort((a, b) => b.commits - a.commits)
     .slice(0, 5);
 
@@ -266,7 +261,6 @@ const RepoStats = () => {
     }
   ];
 
-  const maxCommits = Math.max(...timeSeriesData.map(d => d.commits), 1);
   const maxContributorCommits = Math.max(...contributors.map(c => c.commits), 1);
 
   return (
@@ -345,19 +339,34 @@ const RepoStats = () => {
                       }).join(' ')}
                     />
                     
-                    {/* Data points */}
+                    {/* Data points with hover tooltips */}
                     {timeSeriesData.map((data, index) => {
                       const x = (index / (timeSeriesData.length - 1)) * 380 + 10;
                       const y = 190 - ((data.loc / Math.max(...timeSeriesData.map(d => d.loc), 1)) * 170);
                       return (
-                        <circle
-                          key={index}
-                          cx={x}
-                          cy={y}
-                          r="3"
-                          fill="currentColor"
-                          className="text-primary"
-                        />
+                        <g key={index}>
+                          <circle
+                            cx={x}
+                            cy={y}
+                            r="3"
+                            fill="currentColor"
+                            className="text-primary cursor-pointer hover:r-4 transition-all"
+                          />
+                          <circle
+                            cx={x}
+                            cy={y}
+                            r="8"
+                            fill="transparent"
+                            className="cursor-pointer"
+                          >
+                            <title>
+                              Commit #{data.commits}
+                              {`\n`}Lines of Code: {data.loc.toLocaleString()}
+                              {`\n`}Date: {new Date(data.date).toLocaleDateString()}
+                              {`\n`}Contributor: {data.contributor}
+                            </title>
+                          </circle>
+                        </g>
                       );
                     })}
                   </svg>
@@ -404,6 +413,9 @@ const RepoStats = () => {
                               <p className="text-xs text-muted-foreground">
                                 {new Date(commit.date).toLocaleString()}
                               </p>
+                              <p className="text-xs text-muted-foreground">
+                                <span className="text-green-600">+{commit.additions}</span> <span className="text-red-600">-{commit.deletions}</span>
+                              </p>
                             </div>
                           </div>
                         </div>
@@ -424,6 +436,9 @@ const RepoStats = () => {
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {new Date(commit.date).toLocaleString()}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          <span className="text-green-600">+{commit.additions}</span> <span className="text-red-600">-{commit.deletions}</span>
                         </p>
                       </div>
                     </div>
@@ -451,8 +466,18 @@ const RepoStats = () => {
                       {contributors.map((contributor, index) => (
                         <div key={index} className="flex items-center justify-between p-4 rounded-lg bg-background/20 border border-border/20">
                           <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center font-semibold">
-                              {contributor.avatar}
+                            <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center font-semibold overflow-hidden">
+                              {contributor.avatar_url ? (
+                                <Image 
+                                  src={contributor.avatar_url} 
+                                  alt={contributor.name}
+                                  width={48}
+                                  height={48}
+                                  className="w-full h-full object-cover rounded-full"
+                                />
+                              ) : (
+                                contributor.avatar
+                              )}
                             </div>
                             <div>
                               <p className="font-medium">{contributor.name}</p>
@@ -479,8 +504,18 @@ const RepoStats = () => {
                 {contributors.slice(0, 5).map((contributor, index) => (
                   <div key={index} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center font-semibold">
-                        {contributor.avatar}
+                      <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center font-semibold overflow-hidden">
+                        {contributor.avatar_url ? (
+                          <Image 
+                            src={contributor.avatar_url} 
+                            alt={contributor.name}
+                            width={40}
+                            height={40}
+                            className="w-full h-full object-cover rounded-full"
+                          />
+                        ) : (
+                          contributor.avatar
+                        )}
                       </div>
                       <div>
                         <p className="font-medium text-sm">{contributor.name}</p>

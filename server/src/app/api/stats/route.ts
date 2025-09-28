@@ -50,6 +50,7 @@ interface ContributorStats {
   deletions: number;
   branches: number;
   merges: number;
+  avatar_url?: string;
 }
 
 interface Awards {
@@ -157,9 +158,17 @@ export async function GET(request: NextRequest) {
         });
 
         const stats = commitDetail.data.stats;
+        let author = commit.commit.author?.name || commit.author?.login || 'Unknown';
+        
+        // Filter out system users and normalize names
+        if (author === 'root' || author === 'noreply@github.com' || author === 'GitHub' || 
+            author.toLowerCase().includes('bot') || author.toLowerCase().includes('action')) {
+          author = 'System';
+        }
+        
         detailedCommits.push({
           sha: commit.sha,
-          author: commit.commit.author?.name || commit.author?.login || 'Unknown',
+          author: author,
           date: commit.commit.author?.date || new Date().toISOString(),
           message: commit.commit.message,
           additions: stats?.additions || 0,
@@ -193,14 +202,24 @@ export async function GET(request: NextRequest) {
     const contributorMap = new Map<string, ContributorStats>();
 
     for (const commit of commits.data) {
-      const author = commit.commit.author?.name || commit.author?.login || 'Unknown';
+      let author = commit.commit.author?.name || commit.author?.login || 'Unknown';
+      let avatarUrl = commit.author?.avatar_url;
+      
+      // Filter out system users and normalize names
+      if (author === 'root' || author === 'noreply@github.com' || author === 'GitHub' || 
+          author.toLowerCase().includes('bot') || author.toLowerCase().includes('action')) {
+        author = 'System';
+        avatarUrl = undefined;
+      }
+      
       const existing = contributorMap.get(author) || {
         name: author,
         commits: 0,
         additions: 0,
         deletions: 0,
         branches: 0,
-        merges: 0
+        merges: 0,
+        avatar_url: avatarUrl
       };
 
       existing.commits += 1;
@@ -221,8 +240,15 @@ export async function GET(request: NextRequest) {
       });
 
       if (branchCommits.data.length > 0) {
-        const author = branchCommits.data[0].commit.author?.name ||
-          branchCommits.data[0].author?.login || 'Unknown';
+        let author = branchCommits.data[0].commit.author?.name || 
+                     branchCommits.data[0].author?.login || 'Unknown';
+        
+        // Filter out system users and normalize names
+        if (author === 'root' || author === 'noreply@github.com' || author === 'GitHub' || 
+            author.toLowerCase().includes('bot') || author.toLowerCase().includes('action')) {
+          author = 'System';
+        }
+        
         const existing = contributorMap.get(author) || {
           name: author,
           commits: 0,
@@ -236,7 +262,8 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const contributorStats = Array.from(contributorMap.values());
+    const contributorStats = Array.from(contributorMap.values())
+      .filter(contributor => contributor.name !== 'System');
 
     // Calculate awards
     const awards: Awards = {
@@ -302,6 +329,7 @@ export async function GET(request: NextRequest) {
       timeSeriesData,
       awards,
       stats,
+      contributorStats: contributorStats,
       generatedAt: new Date().toISOString()
     };
 
