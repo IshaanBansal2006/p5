@@ -5,6 +5,7 @@ import { cmdReadmeSync } from './commands/readmeSync.js';
 import { cmdInit } from './commands/init.js';
 import { cmdTest } from './commands/test.js';
 import { cmdDashboard } from './commands/dashboard.js';
+import { webhookCommand } from './commands/webhook.js';
 
 export async function runCLI(): Promise<void> {
   await yargs(hideBin(process.argv))
@@ -17,7 +18,7 @@ export async function runCLI(): Promise<void> {
             alias: 's',
             describe: 'Server URL for P5 APIs',
             type: 'string',
-            default: 'http://localhost:3000'
+            default: 'https://www.player5.dev'
           });
       },
       async (args) => {
@@ -86,7 +87,7 @@ export async function runCLI(): Promise<void> {
             alias: 's',
             describe: 'Server URL for devpost API',
             type: 'string',
-            default: 'http://localhost:3000'
+            default: 'https://www.player5.dev'
           });
       },
       async (args) => {
@@ -110,13 +111,14 @@ export async function runCLI(): Promise<void> {
             alias: 's',
             describe: 'Server URL for README API',
             type: 'string',
-            default: 'http://localhost:3000'
+            default: 'https://www.player5.dev'
           });
       },
       async (args) => {
         await cmdReadmeSync(args);
       }
     )
+    .command(webhookCommand)
     .demandCommand(1, 'You need at least one command before moving on')
     .help()
     .argv;

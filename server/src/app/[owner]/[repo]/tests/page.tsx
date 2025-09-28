@@ -19,7 +19,10 @@ import {
   Bug,
   Activity,
   TrendingUp,
-  BarChart3
+  BarChart3,
+  GitCommit,
+  ExternalLink,
+  User
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
@@ -33,6 +36,28 @@ interface TestExecution {
   totalWarnings: number;
   totalDuration: number;
   stage: string;
+}
+
+// Interface for commit data
+interface CommitData {
+  sha: string;
+  author: string;
+  authorEmail?: string;
+  date: string;
+  message: string;
+  additions: number;
+  deletions: number;
+  changes: number;
+  avatar_url?: string;
+  html_url: string;
+}
+
+// Interface for timeline item
+interface TimelineItem {
+  id: string;
+  type: 'test' | 'commit';
+  timestamp: string;
+  data: TestExecution | CommitData;
 }
 
 interface DetailedTestExecution extends TestExecution {
@@ -68,64 +93,192 @@ const Tests = () => {
   const [filterStage, setFilterStage] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [showDetailed, setShowDetailed] = useState(false);
+  const [showCommits, setShowCommits] = useState(true);
   const [testExecutions, setTestExecutions] = useState<TestExecution[]>([]);
   const [detailedExecutions, setDetailedExecutions] = useState<DetailedTestExecution[]>([]);
+  const [commits, setCommits] = useState<CommitData[]>([]);
+  const [timelineItems, setTimelineItems] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedExecution, setSelectedExecution] = useState<DetailedTestExecution | null>(null);
+  const [commitsPage, setCommitsPage] = useState(1);
+  const [hasMoreCommits, setHasMoreCommits] = useState(false);
+  const [loadingMoreCommits, setLoadingMoreCommits] = useState(false);
 
-  // Fetch test executions from API
+  // Fetch test executions and commits from API
   useEffect(() => {
-    const fetchTestExecutions = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
-        console.log(`Fetching test executions for ${owner}/${repo}`);
+        console.log(`Fetching data for ${owner}/${repo}`);
         
-        const response = await fetch(`/api/test-executions?owner=${owner}&repo=${repo}&detailed=${showDetailed}`);
+        // Fetch both test executions and commits in parallel
+        const [testResponse, commitsResponse] = await Promise.all([
+          fetch(`/api/test-executions?owner=${owner}&repo=${repo}&detailed=${showDetailed}`),
+          fetch(`/api/commits?owner=${owner}&repo=${repo}&limit=10&page=1`)
+        ]);
         
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          console.error('API Error:', errorData);
-          throw new Error(`Failed to fetch test executions: ${response.status} ${errorData.error || response.statusText}`);
+        if (!testResponse.ok) {
+          const errorData = await testResponse.json().catch(() => ({}));
+          console.error('Test executions API Error:', errorData);
+          throw new Error(`Failed to fetch test executions: ${testResponse.status} ${errorData.error || testResponse.statusText}`);
         }
 
-        const data = await response.json();
-        console.log('Test executions data received:', data);
+        if (!commitsResponse.ok) {
+          const errorData = await commitsResponse.json().catch(() => ({}));
+          console.error('Commits API Error:', errorData);
+          throw new Error(`Failed to fetch commits: ${commitsResponse.status} ${errorData.error || commitsResponse.statusText}`);
+        }
+
+        const [testData, commitsData] = await Promise.all([
+          testResponse.json(),
+          commitsResponse.json()
+        ]);
+        
+        console.log('Test executions data received:', testData);
+        console.log('Commits data received:', commitsData);
         
         if (showDetailed) {
-          setDetailedExecutions(data.executions || []);
+          setDetailedExecutions(testData.executions || []);
         } else {
-          setTestExecutions(data.executions || []);
+          setTestExecutions(testData.executions || []);
         }
+        setCommits(commitsData.commits || []);
+        setCommitsPage(commitsData.page || 1);
+        setHasMoreCommits(commitsData.hasMore || false);
+        
+        // Create timeline items
+        const timeline: TimelineItem[] = [];
+        
+        // Add test executions to timeline
+        (testData.executions || []).forEach((execution: TestExecution) => {
+          timeline.push({
+            id: `test_${execution.id}`,
+            type: 'test',
+            timestamp: execution.executedAt,
+            data: execution
+          });
+        });
+        
+        // Add commits to timeline
+        (commitsData.commits || []).forEach((commit: CommitData) => {
+          timeline.push({
+            id: `commit_${commit.sha}`,
+            type: 'commit',
+            timestamp: commit.date,
+            data: commit
+          });
+        });
+        
+        // Sort timeline by timestamp (newest first)
+        timeline.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setTimelineItems(timeline);
+        
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'An error occurred';
         setError(errorMessage);
-        console.error('Error fetching test executions:', err);
+        console.error('Error fetching data:', err);
       } finally {
         setLoading(false);
       }
     };
 
     if (owner && repo) {
-      fetchTestExecutions();
+      fetchData();
     }
   }, [owner, repo, showDetailed]);
 
-  const handleRefresh = async () => {
-    setLoading(true);
+  const handleLoadMoreCommits = async () => {
+    if (loadingMoreCommits || !hasMoreCommits) return;
+    
+    setLoadingMoreCommits(true);
     try {
-      const response = await fetch(`/api/test-executions?owner=${owner}&repo=${repo}&detailed=${showDetailed}`);
+      const nextPage = commitsPage + 1;
+      const response = await fetch(`/api/commits?owner=${owner}&repo=${repo}&limit=10&page=${nextPage}`);
+      
       if (response.ok) {
-        const data = await response.json();
-        if (showDetailed) {
-          setDetailedExecutions(data.executions || []);
-        } else {
-          setTestExecutions(data.executions || []);
-        }
+        const commitsData = await response.json();
+        const newCommits = commitsData.commits || [];
+        
+        // Add new commits to existing commits
+        setCommits(prevCommits => [...prevCommits, ...newCommits]);
+        setCommitsPage(nextPage);
+        setHasMoreCommits(commitsData.hasMore || false);
+        
+        // Update timeline with new commits
+        const newTimelineItems: TimelineItem[] = newCommits.map((commit: CommitData) => ({
+          id: `commit_${commit.sha}`,
+          type: 'commit',
+          timestamp: commit.date,
+          data: commit
+        }));
+        
+        setTimelineItems(prevItems => {
+          const updated = [...prevItems, ...newTimelineItems];
+          // Re-sort timeline by timestamp (newest first)
+          return updated.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        });
       }
     } catch (err) {
-      console.error('Error refreshing test executions:', err);
+      console.error('Error loading more commits:', err);
+    } finally {
+      setLoadingMoreCommits(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setLoading(true);
+    setCommitsPage(1);
+    setHasMoreCommits(false);
+    try {
+      // Fetch both test executions and commits in parallel
+      const [testResponse, commitsResponse] = await Promise.all([
+        fetch(`/api/test-executions?owner=${owner}&repo=${repo}&detailed=${showDetailed}`),
+        fetch(`/api/commits?owner=${owner}&repo=${repo}&limit=10&page=1`)
+      ]);
+      
+      if (testResponse.ok && commitsResponse.ok) {
+        const [testData, commitsData] = await Promise.all([
+          testResponse.json(),
+          commitsResponse.json()
+        ]);
+        
+        if (showDetailed) {
+          setDetailedExecutions(testData.executions || []);
+        } else {
+          setTestExecutions(testData.executions || []);
+        }
+        setCommits(commitsData.commits || []);
+        setCommitsPage(commitsData.page || 1);
+        setHasMoreCommits(commitsData.hasMore || false);
+        
+        // Update timeline
+        const timeline: TimelineItem[] = [];
+        
+        (testData.executions || []).forEach((execution: TestExecution) => {
+          timeline.push({
+            id: `test_${execution.id}`,
+            type: 'test',
+            timestamp: execution.executedAt,
+            data: execution
+          });
+        });
+        
+        (commitsData.commits || []).forEach((commit: CommitData) => {
+          timeline.push({
+            id: `commit_${commit.sha}`,
+            type: 'commit',
+            timestamp: commit.date,
+            data: commit
+          });
+        });
+        
+        timeline.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setTimelineItems(timeline);
+      }
+    } catch (err) {
+      console.error('Error refreshing data:', err);
     } finally {
       setLoading(false);
     }
@@ -176,13 +329,89 @@ const Tests = () => {
     }
   };
 
-  const filteredExecutions = (showDetailed ? detailedExecutions : testExecutions).filter(execution => {
-    if (filterStage !== "all" && execution.stage !== filterStage) return false;
-    if (filterStatus !== "all") {
-      const status = getStatusText(execution);
-      if (filterStatus === "passed" && status !== "Passed") return false;
-      if (filterStatus === "failed" && status !== "Failed") return false;
-      if (filterStatus === "warnings" && status !== "Warnings") return false;
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 1) return 'Just now';
+    if (diffInHours < 24) return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
+    
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays < 7) return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
+    
+    const diffInWeeks = Math.floor(diffInDays / 7);
+    return `${diffInWeeks} week${diffInWeeks > 1 ? 's' : ''} ago`;
+  };
+
+  const renderCommit = (commit: CommitData) => (
+    <div className="p-4 rounded-lg bg-background/20 border border-border/20 hover:border-primary/20 transition-smooth">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-start gap-3">
+          <GitCommit className="w-5 h-5 text-blue-500 mt-1" />
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-sm font-mono text-muted-foreground">{commit.sha.substring(0, 7)}</span>
+              <Badge variant="outline" className="border-blue-500/20 text-blue-500 bg-blue-500/10">
+                Commit
+              </Badge>
+            </div>
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <Calendar className="w-4 h-4" />
+                <span>{formatTimeAgo(commit.date)}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-green-600">+{commit.additions}</span>
+                <span className="text-red-600">-{commit.deletions}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <a
+            href={commit.html_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-500 hover:text-blue-600 transition-colors"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </a>
+        </div>
+      </div>
+      
+      <div className="mb-3">
+        <p className="font-medium text-sm mb-2">{commit.message}</p>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-1">
+            {commit.avatar_url ? (
+              <img 
+                src={commit.avatar_url} 
+                alt={commit.author}
+                className="w-4 h-4 rounded-full"
+              />
+            ) : (
+              <User className="w-4 h-4" />
+            )}
+            <span>{commit.author}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const filteredTimelineItems = timelineItems.filter(item => {
+    if (item.type === 'test') {
+      const execution = item.data as TestExecution;
+      if (filterStage !== "all" && execution.stage !== filterStage) return false;
+      if (filterStatus !== "all") {
+        const status = getStatusText(execution);
+        if (filterStatus === "passed" && status !== "Passed") return false;
+        if (filterStatus === "failed" && status !== "Failed") return false;
+        if (filterStatus === "warnings" && status !== "Warnings") return false;
+      }
+    } else if (item.type === 'commit') {
+      if (!showCommits) return false;
     }
     return true;
   });
@@ -267,13 +496,20 @@ const Tests = () => {
           ))}
         </div>
 
-        {/* Test Executions Timeline */}
+        {/* Test Executions & Commits Timeline */}
         <Card className="p-6 bg-gradient-card border-border/40">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold flex items-center gap-2">
-              <Activity className="w-5 h-5 text-primary" />
-              Test Execution Timeline ({filteredExecutions.length})
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Activity className="w-5 h-5 text-primary" />
+                Test & Commit Timeline ({filteredTimelineItems.length})
+              </h3>
+              {showCommits && commits.length > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  {commits.length} commits loaded
+                </Badge>
+              )}
+            </div>
             <div className="flex gap-2">
               <Dialog open={showFilter} onOpenChange={setShowFilter}>
                 <DialogTrigger asChild>
@@ -328,6 +564,19 @@ const Tests = () => {
                         Show detailed view
                       </label>
                     </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="showCommits"
+                        checked={showCommits}
+                        onCheckedChange={(checked) => setShowCommits(checked as boolean)}
+                      />
+                      <label
+                        htmlFor="showCommits"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        Show commits in timeline
+                      </label>
+                    </div>
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
@@ -335,6 +584,7 @@ const Tests = () => {
                           setFilterStage("all");
                           setFilterStatus("all");
                           setShowDetailed(false);
+                          setShowCommits(true);
                         }}
                       >
                         Clear Filters
@@ -353,66 +603,96 @@ const Tests = () => {
           </div>
 
           <div className="space-y-4">
-            {filteredExecutions.length === 0 ? (
+            {filteredTimelineItems.length === 0 ? (
               <div className="text-center py-12">
                 <Play className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No Test Executions Found</h3>
+                <h3 className="text-lg font-semibold mb-2">No Timeline Data Found</h3>
                 <p className="text-muted-foreground">
-                  Run <code className="bg-muted px-2 py-1 rounded">npx p5 test</code> to start tracking test executions.
+                  Run <code className="bg-muted px-2 py-1 rounded">npx p5 test</code> to start tracking test executions and see commit history.
                 </p>
               </div>
             ) : (
-              filteredExecutions.map((execution, index) => (
-                <div key={execution.id} className="p-4 rounded-lg bg-background/20 border border-border/20 hover:border-primary/20 transition-smooth">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-start gap-3">
-                      {getStatusIcon(execution)}
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-mono text-muted-foreground">{execution.id}</span>
-                          <Badge variant="outline" className={getStatusColor(execution)}>
-                            {getStatusText(execution)}
-                          </Badge>
-                          <Badge variant="secondary">
-                            {execution.stage}
-                          </Badge>
+              filteredTimelineItems.map((item, index) => (
+                <div key={item.id}>
+                  {item.type === 'test' ? (
+                    <div className="p-4 rounded-lg bg-background/20 border border-border/20 hover:border-primary/20 transition-smooth">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-start gap-3">
+                          {getStatusIcon(item.data as TestExecution)}
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-sm font-mono text-muted-foreground">{(item.data as TestExecution).id}</span>
+                              <Badge variant="outline" className={getStatusColor(item.data as TestExecution)}>
+                                {getStatusText(item.data as TestExecution)}
+                              </Badge>
+                              <Badge variant="secondary">
+                                {(item.data as TestExecution).stage}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                <Calendar className="w-4 h-4" />
+                                <span>{formatTimeAgo(item.timestamp)}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Clock className="w-4 h-4" />
+                                <span>{((item.data as TestExecution).totalDuration / 1000).toFixed(2)}s</span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="w-4 h-4" />
-                            <span>{new Date(execution.executedAt).toLocaleString()}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Clock className="w-4 h-4" />
-                            <span>{(execution.totalDuration / 1000).toFixed(2)}s</span>
-                          </div>
+                        <div className="flex items-center gap-2">
+                          {(item.data as TestExecution).totalErrors > 0 && (
+                            <div className="flex items-center gap-1 text-red-500">
+                              <Bug className="w-4 h-4" />
+                              <span className="text-sm font-medium">{(item.data as TestExecution).totalErrors} errors</span>
+                            </div>
+                          )}
+                          {(item.data as TestExecution).totalWarnings > 0 && (
+                            <div className="flex items-center gap-1 text-yellow-500">
+                              <AlertTriangle className="w-4 h-4" />
+                              <span className="text-sm font-medium">{(item.data as TestExecution).totalWarnings} warnings</span>
+                            </div>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewDetails(item.data as TestExecution)}
+                          >
+                            View Details
+                          </Button>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {execution.totalErrors > 0 && (
-                        <div className="flex items-center gap-1 text-red-500">
-                          <Bug className="w-4 h-4" />
-                          <span className="text-sm font-medium">{execution.totalErrors} errors</span>
-                        </div>
-                      )}
-                      {execution.totalWarnings > 0 && (
-                        <div className="flex items-center gap-1 text-yellow-500">
-                          <AlertTriangle className="w-4 h-4" />
-                          <span className="text-sm font-medium">{execution.totalWarnings} warnings</span>
-                        </div>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleViewDetails(execution)}
-                      >
-                        View Details
-                      </Button>
-                    </div>
-                  </div>
+                  ) : (
+                    renderCommit(item.data as CommitData)
+                  )}
                 </div>
               ))
+            )}
+            
+            {/* Show More Commits Button */}
+            {hasMoreCommits && showCommits && (
+              <div className="flex justify-center pt-4">
+                <Button
+                  variant="outline"
+                  onClick={handleLoadMoreCommits}
+                  disabled={loadingMoreCommits}
+                  className="flex items-center gap-2"
+                >
+                  {loadingMoreCommits ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Loading more commits...
+                    </>
+                  ) : (
+                    <>
+                      <GitCommit className="w-4 h-4" />
+                      Show More Commits
+                    </>
+                  )}
+                </Button>
+              </div>
             )}
           </div>
         </Card>
