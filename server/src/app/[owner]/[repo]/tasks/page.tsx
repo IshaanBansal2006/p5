@@ -790,21 +790,6 @@ const Tasks = () => {
                 </div>
               </div>
             </div>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-background/20">
-                <span className="text-sm">Auto Bug Tagging</span>
-                <span className="inline-block bg-yellow-500/20 text-yellow-500 px-2 py-1 text-xs rounded">Pending</span>
-              </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-background/20">
-                <span className="text-sm">Performance Monitoring</span>
-                <span className="inline-block bg-green-500/20 text-green-500 px-2 py-1 text-xs rounded">Active</span>
-              </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-background/20">
-                <span className="text-sm">Automated Testing</span>
-                <span className="inline-block bg-green-500/20 text-green-500 px-2 py-1 text-xs rounded">Active</span>
-              </div>
-            </div>
-          </div>
         </Card>
       </div>
     </RepoLayout>
