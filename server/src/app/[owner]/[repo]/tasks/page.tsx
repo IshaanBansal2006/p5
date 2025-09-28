@@ -99,36 +99,91 @@ const Tasks = () => {
     { icon: Clock, label: "In Progress", value: tasks.filter(t => t.status === "in-progress").length.toString(), color: "text-yellow-500" },
   ];
 
-  const handleTaskClick = (taskId: string) => {
+  const handleTaskClick = async (taskId: string) => {
+    // Find the current task to determine new status
+    const currentTask = tasks.find(task => task.id === taskId);
+    if (!currentTask) return;
+
+    let newStatus: 'todo' | 'in-progress' | 'completed' | 'cancelled';
+    let newCompleted: boolean;
+    
+    switch (currentTask.status) {
+      case "todo":
+        newStatus = "in-progress";
+        newCompleted = false;
+        break;
+      case "in-progress":
+        newStatus = "completed";
+        newCompleted = true;
+        break;
+      case "completed":
+        newStatus = "todo";
+        newCompleted = false;
+        break;
+      default:
+        newStatus = "todo";
+        newCompleted = false;
+    }
+
+    // Optimistically update the UI
     setTasks(prevTasks => 
       prevTasks.map(task => {
         if (task.id === taskId) {
-          let newStatus: 'todo' | 'in-progress' | 'completed' | 'cancelled';
-          let newCompleted: boolean;
-          
-          switch (task.status) {
-            case "todo":
-              newStatus = "in-progress";
-              newCompleted = false;
-              break;
-            case "in-progress":
-              newStatus = "completed";
-              newCompleted = true;
-              break;
-            case "completed":
-              newStatus = "todo";
-              newCompleted = false;
-              break;
-            default:
-              newStatus = "todo";
-              newCompleted = false;
-          }
-          
           return { ...task, status: newStatus, completed: newCompleted };
         }
         return task;
       })
     );
+
+    // Update the task status in Redis
+    try {
+      const response = await fetch('/api/updateTask', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          owner,
+          repo,
+          taskId,
+          status: newStatus
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Failed to update task status:', errorData);
+        
+        // Revert the optimistic update on error
+        setTasks(prevTasks => 
+          prevTasks.map(task => {
+            if (task.id === taskId) {
+              return currentTask; // Revert to original state
+            }
+            return task;
+          })
+        );
+        
+        setError('Failed to update task status');
+        return;
+      }
+
+      console.log(`Task ${taskId} status updated to ${newStatus}`);
+    } catch (error) {
+      console.error('Error updating task status:', error);
+      
+      // Revert the optimistic update on error
+      setTasks(prevTasks => 
+        prevTasks.map(task => {
+          if (task.id === taskId) {
+            return currentTask; // Revert to original state
+          }
+          return task;
+        })
+      );
+      
+      setError('Failed to update task status');
+    }
   };
 
 

@@ -173,31 +173,86 @@ const RepoBugs = () => {
     }
   };
 
-  const handleBugCheck = (bugId: string) => {
+  const handleBugCheck = async (bugId: string) => {
+    // Find the current bug to determine new status
+    const currentBug = bugs.find(bug => bug.id === bugId);
+    if (!currentBug) return;
+
+    let newStatus: 'open' | 'in-progress' | 'resolved' | 'closed';
+    
+    switch (currentBug.status) {
+      case "open":
+        newStatus = "in-progress";
+        break;
+      case "in-progress":
+        newStatus = "resolved";
+        break;
+      case "resolved":
+        newStatus = "open";
+        break;
+      default:
+        newStatus = "open";
+    }
+
+    // Optimistically update the UI
     setBugs(prevBugs => 
       prevBugs.map(bug => {
         if (bug.id === bugId) {
-          let newStatus: 'open' | 'in-progress' | 'resolved' | 'closed';
-          
-          switch (bug.status) {
-            case "open":
-              newStatus = "in-progress";
-              break;
-            case "in-progress":
-              newStatus = "resolved";
-              break;
-            case "resolved":
-              newStatus = "open";
-              break;
-            default:
-              newStatus = "open";
-          }
-          
           return { ...bug, status: newStatus, updatedAt: new Date().toISOString() };
         }
         return bug;
       })
     );
+
+    // Update the bug status in Redis
+    try {
+      const response = await fetch('/api/updateBug', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          owner,
+          repo,
+          bugId,
+          status: newStatus
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Failed to update bug status:', errorData);
+        
+        // Revert the optimistic update on error
+        setBugs(prevBugs => 
+          prevBugs.map(bug => {
+            if (bug.id === bugId) {
+              return currentBug; // Revert to original state
+            }
+            return bug;
+          })
+        );
+        
+        setError('Failed to update bug status');
+        return;
+      }
+
+      console.log(`Bug ${bugId} status updated to ${newStatus}`);
+    } catch (error) {
+      console.error('Error updating bug status:', error);
+      
+      // Revert the optimistic update on error
+      setBugs(prevBugs => 
+        prevBugs.map(bug => {
+          if (bug.id === bugId) {
+            return currentBug; // Revert to original state
+          }
+          return bug;
+        })
+      );
+      
+      setError('Failed to update bug status');
+    }
   };
 
   const filteredBugs = bugs.filter(bug => {
