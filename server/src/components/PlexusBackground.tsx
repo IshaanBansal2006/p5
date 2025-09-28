@@ -7,9 +7,9 @@ import p5 from 'p5';
 // --- P5.js Sketch Logic ---
 const sketch = (p: p5) => {
     let particles: Particle[] = [];
-    const NUM_PARTICLES = 150;
+    const NUM_PARTICLES = 300;
     const MAX_DISTANCE = 110;
-    const MOVE_SPEED = 0.5;
+    const MOVE_SPEED = 1.0;
     const PARTICLE_COLOR = [255, 215, 0]; // Soft Gold/Yellow
 
     class Particle {
