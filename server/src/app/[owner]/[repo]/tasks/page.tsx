@@ -11,7 +11,7 @@ import { SquareCheck as CheckSquare, Square, Clock, User, Plus, Zap, Filter, Cal
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
+import RepoLayout from "@/components/RepoLayout";
 
 const Tasks = () => {
   const params = useParams();
@@ -224,33 +224,10 @@ const Tasks = () => {
   const assignees = [...new Set(tasks.map(task => task.assignee))];
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border/40 backdrop-blur-sm bg-background/80 sticky top-0 z-50">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-3">
-              <Image src="/p5-logo.png" alt="Player5" width={32} height={32} className="w-8 h-8" />
-              <span className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                Player5
-              </span>
-            </Link>
-            <div className="flex items-center gap-4">
-              <Link href={`/${owner}/${repo}`}>
-                <Button variant="outline" size="sm">
-                  Back to Stats
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <div className="container mx-auto px-6 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">{owner}/{repo} - Tasks</h1>
-          <p className="text-muted-foreground">Project task management and tracking</p>
-        </div>
+    <RepoLayout>
+      <div className="mb-8">
+        <p className="text-muted-foreground">Project task management and tracking</p>
+      </div>
 
         <div className="space-y-8">
           {/* Task Stats */}
@@ -538,8 +515,7 @@ const Tasks = () => {
             </div>
           </Card>
         </div>
-      </div>
-    </div>
+    </RepoLayout>
   );
 };
 

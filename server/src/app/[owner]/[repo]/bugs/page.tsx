@@ -8,7 +8,7 @@ import { Bug, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Clock, Zap
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
+import RepoLayout from "@/components/RepoLayout";
 
 const RepoBugs = () => {
   const params = useParams();
@@ -160,33 +160,10 @@ const RepoBugs = () => {
   const assignees = [...new Set(bugs.map(bug => bug.assignee))];
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border/40 backdrop-blur-sm bg-background/80 sticky top-0 z-50">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-3">
-              <Image src="/p5-logo.png" alt="Player5" width={32} height={32} className="w-8 h-8" />
-              <span className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                Player5
-              </span>
-            </Link>
-            <div className="flex items-center gap-4">
-              <Link href={`/${owner}/${repo}`}>
-                <Button variant="outline" size="sm">
-                  Back to Stats
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <div className="container mx-auto px-6 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">{owner}/{repo} - Bugs</h1>
-          <p className="text-muted-foreground">Issue tracking and bug management</p>
-        </div>
+    <RepoLayout>
+      <div className="mb-8">
+        <p className="text-muted-foreground">Issue tracking and bug management</p>
+      </div>
 
         <div className="space-y-8">
           {/* Bug Stats */}
@@ -381,8 +358,7 @@ const RepoBugs = () => {
             </div>
           </Card>
         </div>
-      </div>
-    </div>
+    </RepoLayout>
   );
 };
 

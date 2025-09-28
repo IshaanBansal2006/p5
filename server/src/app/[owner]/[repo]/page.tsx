@@ -7,7 +7,7 @@ import { GitCommitVertical as GitCommit, Users, Clock, TrendingUp, GitBranch, St
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
+import RepoLayout from "@/components/RepoLayout";
 
 interface StatsData {
   branches: { current: number; percentChange: number };
@@ -128,26 +128,28 @@ const RepoStats = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex items-center gap-3">
-          <Loader2 className="w-6 h-6 animate-spin" />
-          <span>Loading repository statistics...</span>
+      <RepoLayout>
+        <div className="flex items-center justify-center py-20">
+          <div className="flex items-center gap-3">
+            <Loader2 className="w-6 h-6 animate-spin" />
+            <span>Loading repository statistics...</span>
+          </div>
         </div>
-      </div>
+      </RepoLayout>
     );
   }
 
   if (error || !statsData) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
+      <RepoLayout>
+        <div className="text-center py-20">
           <h2 className="text-2xl font-bold mb-2">Error Loading Stats</h2>
           <p className="text-muted-foreground mb-4">{error || 'Failed to load repository statistics'}</p>
           <Link href="/">
             <Button>Go Home</Button>
           </Link>
         </div>
-      </div>
+      </RepoLayout>
     );
   }
 
@@ -268,50 +270,27 @@ const RepoStats = () => {
   const maxContributorCommits = Math.max(...contributors.map(c => c.commits), 1);
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border/40 backdrop-blur-sm bg-background/80 sticky top-0 z-50">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-3">
-              <Image src="/p5-logo.png" alt="Player5" width={32} height={32} className="w-8 h-8" />
-              <span className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                Player5
-              </span>
-            </Link>
-            <div className="flex items-center gap-4">
-              <Link href="/">
-                <Button variant="outline" size="sm">
-                  Home
-                </Button>
-              </Link>
-            </div>
+    <RepoLayout>
+      <div className="mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-muted-foreground">Repository Statistics & Analytics</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Last updated: {new Date(statsData.generatedAt).toLocaleString()}
+            </p>
           </div>
+          <a 
+            href={`https://github.com/${owner}/${repo}`} 
+            target="_blank" 
+            rel="noopener noreferrer"
+          >
+            <Button variant="outline" size="sm">
+              <Github className="w-4 h-4 mr-2" />
+              View on GitHub
+            </Button>
+          </a>
         </div>
-      </header>
-
-      <div className="container mx-auto px-6 py-8">
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">{owner}/{repo}</h1>
-              <p className="text-muted-foreground">Repository Statistics & Analytics</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Last updated: {new Date(statsData.generatedAt).toLocaleString()}
-              </p>
-            </div>
-            <a 
-              href={`https://github.com/${owner}/${repo}`} 
-              target="_blank" 
-              rel="noopener noreferrer"
-            >
-              <Button variant="outline" size="sm">
-                <Github className="w-4 h-4 mr-2" />
-                View on GitHub
-              </Button>
-            </a>
-          </div>
-        </div>
+      </div>
 
         <div className="space-y-8">
           {/* Overview Stats */}
@@ -542,18 +521,8 @@ const RepoStats = () => {
             </div>
           </Card>
 
-          {/* Navigation */}
-          <div className="flex gap-4">
-            <Link href={`/${owner}/${repo}/bugs`}>
-              <Button variant="outline">View Bugs</Button>
-            </Link>
-            <Link href={`/${owner}/${repo}/tasks`}>
-              <Button variant="outline">View Tasks</Button>
-            </Link>
-          </div>
         </div>
-      </div>
-    </div>
+    </RepoLayout>
   );
 };
 
