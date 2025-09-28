@@ -709,7 +709,7 @@ const Tasks = () => {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         <div className="flex items-center gap-2">
-                          <span>Assigned to</span>
+                          <span className="text-muted-foreground font-medium">Assigned to</span>
                           <ContributorDisplay
                             assignee={task.assignee}
                             owner={owner as string}
@@ -717,11 +717,11 @@ const Tasks = () => {
                           />
                         </div>
                         <span>•</span>
-                        <span>{new Date(task.createdAt).toLocaleDateString()}</span>
+                        <span className="text-foreground/80">{new Date(task.createdAt).toLocaleDateString()}</span>
                         {task.dueDate && (
                           <>
                             <span>•</span>
-                            <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
+                            <span className="text-foreground/80">Due: {new Date(task.dueDate).toLocaleDateString()}</span>
                           </>
                         )}
                       </div>

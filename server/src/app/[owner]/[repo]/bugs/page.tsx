@@ -715,7 +715,7 @@ const RepoBugs = () => {
                       <div className="flex items-center justify-between">
                         <div className={`flex items-center gap-4 text-sm text-muted-foreground ${bug.status === "resolved" || bug.status === "closed" ? "line-through" : ""}`}>
                           <div className="flex items-center gap-2">
-                            <span>Reported by</span>
+                            <span className="text-muted-foreground font-medium">Reported by</span>
                             <ContributorDisplay
                               assignee={bug.reporter}
                               owner={owner as string}
@@ -724,7 +724,7 @@ const RepoBugs = () => {
                           </div>
                           <span>•</span>
                           <div className="flex items-center gap-2">
-                            <span>Assigned to</span>
+                            <span className="text-muted-foreground font-medium">Assigned to</span>
                             <ContributorDisplay
                               assignee={bug.assignee}
                               owner={owner as string}
@@ -732,7 +732,7 @@ const RepoBugs = () => {
                             />
                           </div>
                           <span>•</span>
-                          <span>{new Date(bug.createdAt).toLocaleDateString()}</span>
+                          <span className="text-foreground/80">{new Date(bug.createdAt).toLocaleDateString()}</span>
                         </div>
                         <div className="flex gap-1">
                           {bug.labels.map((label, labelIndex) => (

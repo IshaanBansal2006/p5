@@ -29,13 +29,16 @@ export function ContributorDisplay({
   const [contributor, setContributor] = useState<Contributor | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Normalize assignee - use "unassigned" if empty or undefined
+  const normalizedAssignee = assignee && assignee.trim() !== '' ? assignee : 'unassigned';
+
   // Fetch contributor info if assignee looks like a GitHub username
   useEffect(() => {
     const fetchContributor = async () => {
-      if (!assignee || !owner || !repo) return;
+      if (!normalizedAssignee || normalizedAssignee === 'unassigned' || !owner || !repo) return;
       
       // Only fetch if assignee looks like a GitHub username (no spaces, special chars)
-      if (!/^[a-zA-Z0-9_-]+$/.test(assignee)) return;
+      if (!/^[a-zA-Z0-9_-]+$/.test(normalizedAssignee)) return;
       
       try {
         setLoading(true);
@@ -43,7 +46,7 @@ export function ContributorDisplay({
         
         if (response.ok) {
           const data = await response.json();
-          const foundContributor = data.contributors?.find((c: Contributor) => c.login === assignee);
+          const foundContributor = data.contributors?.find((c: Contributor) => c.login === normalizedAssignee);
           if (foundContributor) {
             setContributor(foundContributor);
           }
@@ -56,7 +59,7 @@ export function ContributorDisplay({
     };
 
     fetchContributor();
-  }, [assignee, owner, repo]);
+  }, [normalizedAssignee, owner, repo]);
 
   if (loading) {
     return (
@@ -75,11 +78,11 @@ export function ContributorDisplay({
           <AvatarFallback>{contributor.login.charAt(0).toUpperCase()}</AvatarFallback>
         </Avatar>
         <div className="flex flex-col">
-          <span className="text-sm font-medium text-gray-900">
+          <span className="text-sm font-medium text-foreground">
             {contributor.login}
           </span>
           {showContributions && (
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-muted-foreground">
               {contributor.contributions} contributions
             </span>
           )}
@@ -91,12 +94,12 @@ export function ContributorDisplay({
   // Fallback for non-contributor assignees
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center">
-        <span className="text-xs font-medium text-gray-600">
-          {assignee.charAt(0).toUpperCase()}
+      <div className="w-6 h-6 bg-muted rounded-full flex items-center justify-center">
+        <span className="text-xs font-medium text-muted-foreground">
+          {normalizedAssignee.charAt(0).toUpperCase()}
         </span>
       </div>
-      <span className="text-sm text-gray-700">{assignee}</span>
+      <span className="text-sm font-medium text-foreground">{normalizedAssignee}</span>
     </div>
   );
 }
