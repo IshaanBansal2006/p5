@@ -60,10 +60,7 @@ const Home = () => {
           <div className="container mx-auto px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Image src='/p5-logo.png' alt="player5" width={40} height={40} className="w-10 h-10" />
-                <code className="text-2xl font-bold" style={{ fontFamily: 'Fira Code, monospace' }}>
-                  <span className="font-black bg-gradient-primary bg-clip-text text-transparent">player5</span>
-                </code>
+                <Image src='/p5-logo.png' alt="player5" width={60} height={60} className="w-15 h-15" />
               </div>
               <div className="flex items-center gap-4">
                 <Button variant="ghost" size="sm">
@@ -189,7 +186,7 @@ const Home = () => {
       <footer className="border-t border-border/40 py-12">
         <div className="container mx-auto px-6 text-center">
           <div className="flex items-center justify-center gap-3 mb-4">
-              <Image src="/p5-logo.png" alt="Player5" width={48} height={48} className="w-12 h-12" />
+              <Image src="/p5-logo.png" alt="Player5" width={72} height={72} className="w-18 h-18" />
           </div>
           <p className="text-muted-foreground">
             Making hackathon development faster and less painful, one commit at a time.

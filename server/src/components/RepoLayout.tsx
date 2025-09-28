@@ -96,7 +96,7 @@ const RepoLayout = ({ children }: RepoLayoutProps) => {
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center gap-3">
-              <Image src="/p5-logo.png" alt="Player5" width={64} height={64} className="w-16 h-16" />
+              <Image src="/p5-logo.png" alt="Player5" width={200} height={200} className="w-48 h-48" />
             </Link>
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="sm">
