@@ -231,24 +231,24 @@ const Documentation = () => {
               <div className="grid gap-6">
                 {[
                   {
-                    command: "p5 test",
+                    command: "npx p5 test",
                     description: "Run build tests and basic validation",
-                    example: "p5 test --verbose"
+                    example: "npx p5 test --verbose"
                   },
                   {
-                    command: "p5 devpost gen",
+                    command: "npx p5 devpost gen",
                     description: "Generate Devpost submission draft",
-                    example: "p5 devpost gen --template hackathon"
+                    example: "npx p5 devpost gen --template hackathon"
                   },
                   {
-                    command: "p5 readme update",
+                    command: "npx p5 readme update",
                     description: "Update README with latest project info",
-                    example: "p5 readme update --stats"
+                    example: "npx p5 readme update --stats"
                   },
                   {
-                    command: "p5 watch",
+                    command: "npx p5 watch",
                     description: "Monitor for breaking commits",
-                    example: "p5 watch --notify"
+                    example: "npx p5 watch --notify"
                   }
                 ].map((cmd, index) => (
                   <div key={index} className="bg-background/20 rounded-lg p-4 border border-border/20">

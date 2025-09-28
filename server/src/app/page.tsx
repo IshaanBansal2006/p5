@@ -168,15 +168,15 @@ const Home = () => {
                 <div className="space-y-4 text-left">
                   <div className="flex items-center gap-4">
                     <span className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-sm font-bold">1</span>
-                    <code className="text-primary font-mono">npm install -g p5</code>
+                    <code className="text-primary font-mono">npm i player5</code>
                   </div>
                   <div className="flex items-center gap-4">
                     <span className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-sm font-bold">2</span>
-                    <code className="text-primary font-mono">cd your-project && p5 init</code>
+                    <code className="text-primary font-mono">cd your-project && npx p5 init</code>
                   </div>
                   <div className="flex items-center gap-4">
                     <span className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-sm font-bold">3</span>
-                    <code className="text-primary font-mono">p5 test</code>
+                    <code className="text-primary font-mono">npx p5 test</code>
                   </div>
                 </div>
               </div>
