@@ -104,7 +104,7 @@ const Home = () => {
                   </code>
                   <button
                     onClick={copyToClipboard}
-                    className="p-2 text-gray-400 hover:text-white transition-colors rounded-lg"
+                    className="p-2 text-gray-400 hover:text-white transition-colors rounded-lg absolute right-2"
                   >
                     {copied ? (
                       <Check className="w-4 h-4" />
