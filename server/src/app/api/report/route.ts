@@ -98,7 +98,7 @@ async function processErrorsWithGemini(errors: DetailedError[]): Promise<Process
 You are an expert code analysis assistant. I have a list of ${errors.length} code errors and warnings that need to be processed.
 
 TASK: 
-1. Remove duplicates and extremely similar errors (same root cause, same file/line, similar messages)
+1. Remove duplicates errors (same  messages)
 2. Assign severity ratings: "low", "medium", or "high" based on:
    - HIGH: Build failures, type errors, runtime crashes, security issues
    - MEDIUM: Linting errors, deprecated usage, performance issues
@@ -218,7 +218,7 @@ RESPONSE FORMAT (JSON only, no markdown):
       return acc;
     }, []);
 
-    return uniqueErrors.length > 0 ? uniqueErrors : null;
+    return uniqueErrors.length > 0 ? uniqueErrors : fallbackProcessedErrors;
   }
 }
 
@@ -413,6 +413,18 @@ export async function POST(request: NextRequest) {
     
     console.log(`Processing ${errorCollection.errors.length} errors for ${owner}/${repo}`);
 
+    // Log all the non-unique errors before processing
+    console.log('\n=== RAW ERRORS SENT TO GEMINI ===');
+    errorCollection.errors.forEach((error, index) => {
+      console.log(`${index + 1}. [${error.severity.toUpperCase()}] ${error.taskName} (${error.errorType}):`);
+      console.log(`   Message: ${error.message}`);
+      console.log(`   Location: ${error.location?.file || 'N/A'}:${error.location?.line || 'N/A'}`);
+      console.log(`   Duration: ${error.duration}ms`);
+      console.log(`   Timestamp: ${error.timestamp}`);
+      console.log('');
+    });
+    console.log(`Total raw errors: ${errorCollection.errors.length}\n`);
+
     // Step 1: Process errors with Gemini AI
     const processedErrors = await processErrorsWithGemini(errorCollection.errors);
     
@@ -497,7 +509,18 @@ export async function POST(request: NextRequest) {
         owner,
         repo,
         lastUpdated: new Date().toISOString()
-      }
+      },
+      // Add the detailed unique errors to the response
+      uniqueErrors: processedErrors.map(error => ({
+        id: error.id,
+        severity: error.severity,
+        taskName: error.taskName,
+        message: error.message,
+        category: error.category,
+        location: error.location,
+        occurrences: error.occurrences,
+        suggestedFix: error.suggestedFix
+      }))
     });
 
   } catch (error) {
