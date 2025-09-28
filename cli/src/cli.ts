@@ -4,6 +4,7 @@ import { cmdDevpostGen } from './commands/devpostGen.js';
 import { cmdReadmeSync } from './commands/readmeSync.js';
 import { cmdInit } from './commands/init.js';
 import { cmdTest } from './commands/test.js';
+import { cmdDashboard } from './commands/dashboard.js';
 
 export async function runCLI(): Promise<void> {
   await yargs(hideBin(process.argv))
@@ -42,6 +43,30 @@ export async function runCLI(): Promise<void> {
       },
       async (args) => {
         await cmdTest(args);
+      }
+    )
+    .command(
+      'dashboard [owner] [repo]',
+      'Open P5 dashboard for repository',
+      (yargs) => {
+        return yargs
+          .positional('owner', {
+            describe: 'GitHub repository owner',
+            type: 'string'
+          })
+          .positional('repo', {
+            describe: 'GitHub repository name',
+            type: 'string'
+          })
+          .option('open', {
+            alias: 'o',
+            describe: 'Automatically open dashboard in browser',
+            type: 'boolean',
+            default: false
+          });
+      },
+      async (args) => {
+        await cmdDashboard(args);
       }
     )
     .command(
