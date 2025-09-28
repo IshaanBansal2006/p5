@@ -18,6 +18,44 @@ interface TestConfig {
   prePush: string[];
 }
 
+// Types for error reporting
+interface DetailedError {
+  taskName: string;
+  errorType: 'lint' | 'typecheck' | 'build' | 'test' | 'website' | 'unknown';
+  severity: 'error' | 'warning';
+  message: string;
+  location?: {
+    file?: string;
+    line?: number;
+    column?: number;
+  };
+  timestamp: string;
+  duration: number;
+  rawOutput?: string;
+}
+
+interface RepositoryInfo {
+  owner: string;
+  repo: string;
+  branch?: string;
+  commit?: string;
+  remoteUrl?: string;
+}
+
+interface ErrorCollection {
+  sessionId: string;
+  repository: RepositoryInfo;
+  totalErrors: number;
+  totalWarnings: number;
+  totalDuration: number;
+  stage: string;
+  errors: DetailedError[];
+  summary: {
+    byTask: Record<string, number>;
+    byType: Record<string, number>;
+  };
+}
+
 // Default configuration
 const DEFAULT_CONFIG: TestConfig = {
   preCommit: ['lint', 'typecheck'],
@@ -35,6 +73,277 @@ function packageExists(packageName: string): boolean {
     return !!deps[packageName];
   } catch {
     return false;
+  }
+}
+
+// Function to extract repository info from git
+async function getRepositoryInfo(): Promise<RepositoryInfo> {
+  try {
+    // Get remote URL
+    const remoteResult = await runCommand('git', ['remote', 'get-url', 'origin']);
+    let owner = '', repo = '', remoteUrl = '';
+    
+    if (remoteResult.success && remoteResult.output) {
+      remoteUrl = remoteResult.output.trim();
+      
+      // Parse GitHub URLs (both SSH and HTTPS)
+      // SSH: git@github.com:owner/repo.git
+      // HTTPS: https://github.com/owner/repo.git
+      const sshMatch = remoteUrl.match(/git@github\.com:([^\/]+)\/(.+?)(?:\.git)?$/);
+      const httpsMatch = remoteUrl.match(/https:\/\/github\.com\/([^\/]+)\/(.+?)(?:\.git)?$/);
+      
+      if (sshMatch) {
+        [, owner, repo] = sshMatch;
+      } else if (httpsMatch) {
+        [, owner, repo] = httpsMatch;
+      }
+    }
+    
+    // Get current branch
+    const branchResult = await runCommand('git', ['branch', '--show-current']);
+    const branch = branchResult.success ? branchResult.output.trim() : undefined;
+    
+    // Get current commit hash
+    const commitResult = await runCommand('git', ['rev-parse', 'HEAD']);
+    const commit = commitResult.success ? commitResult.output.trim().substring(0, 7) : undefined;
+    
+    return {
+      owner: owner || 'unknown',
+      repo: repo || 'unknown', 
+      branch,
+      commit,
+      remoteUrl: remoteUrl || undefined
+    };
+  } catch (error) {
+    console.log('Could not extract git info:', error);
+    return {
+      owner: 'unknown',
+      repo: 'unknown'
+    };
+  }
+}
+
+// Enhanced error parsing functions
+function parseDetailedErrors(results: TaskResult[]): DetailedError[] {
+  const detailedErrors: DetailedError[] = [];
+  
+  for (const result of results.filter(r => !r.success && r.error)) {
+    const timestamp = new Date().toISOString();
+    
+    switch (result.name) {
+      case 'lint': { // Start a new scope here
+        // Parse ESLint output
+        const eslintErrors = parseEslintError(result.error!, result, timestamp);
+        detailedErrors.push(...eslintErrors);
+        break;
+      } // End the new scope here
+        
+      case 'typecheck': { // Start a new scope here
+        // Parse TypeScript output 
+        const tsErrors = parseTypescriptError(result.error!, result, timestamp);
+        detailedErrors.push(...tsErrors);
+        break;
+      }
+        
+      case 'build':
+      case 'test':
+      case 'website':
+      default:
+        // Generic error parsing
+        detailedErrors.push({
+          taskName: result.name,
+          errorType: (result.name as any) || 'unknown',
+          severity: 'error', // Default to error for failed tasks
+          message: result.error!,
+          timestamp,
+          duration: result.duration,
+          rawOutput: result.error
+        });
+    }
+  }
+  
+  return detailedErrors;
+}
+
+function parseEslintError(output: string, taskResult: TaskResult, timestamp: string): DetailedError[] {
+  const errors: DetailedError[] = [];
+  const lines = output.split('\n');
+  
+  for (const line of lines) {
+    // ESLint format: /path/to/file.js:line:column: error/warning message
+    const match = line.match(/(.+?):(\d+):(\d+):\s+(error|warning)\s+(.+)/);
+    if (match) {
+      const [, file, lineNum, column, severity, message] = match;
+      errors.push({
+        taskName: taskResult.name,
+        errorType: 'lint',
+        severity: severity as 'error' | 'warning',
+        message: message.trim(),
+        location: {
+          file: file.replace(process.cwd(), '.'), // Relative path
+          line: parseInt(lineNum),
+          column: parseInt(column)
+        },
+        timestamp,
+        duration: taskResult.duration,
+        rawOutput: line
+      });
+    }
+  }
+  
+  // If no specific errors found, create a generic one
+  if (errors.length === 0) {
+    errors.push({
+      taskName: taskResult.name,
+      errorType: 'lint',
+      severity: 'error',
+      message: output.trim() || 'Linting failed',
+      timestamp,
+      duration: taskResult.duration,
+      rawOutput: output
+    });
+  }
+  
+  return errors;
+}
+
+function parseTypescriptError(output: string, taskResult: TaskResult, timestamp: string): DetailedError[] {
+  const errors: DetailedError[] = [];
+  const lines = output.split('\n');
+  
+  for (const line of lines) {
+    // TypeScript format: src/file.ts(line,column): error TS2304: message
+    const match = line.match(/(.+?)\((\d+),(\d+)\):\s+(error|warning)\s+TS\d+:\s*(.+)/);
+    if (match) {
+      const [, file, lineNum, column, severity, message] = match;
+      errors.push({
+        taskName: taskResult.name,
+        errorType: 'typecheck',
+        severity: severity as 'error' | 'warning',
+        message: message.trim(),
+        location: {
+          file: file.replace(process.cwd(), '.'),
+          line: parseInt(lineNum),
+          column: parseInt(column)
+        },
+        timestamp,
+        duration: taskResult.duration,
+        rawOutput: line
+      });
+    }
+  }
+  
+  // If no specific errors found, create a generic one
+  if (errors.length === 0) {
+    errors.push({
+      taskName: taskResult.name,
+      errorType: 'typecheck',
+      severity: 'error',
+      message: output.trim() || 'Type checking failed',
+      timestamp,
+      duration: taskResult.duration,
+      rawOutput: output
+    });
+  }
+  
+  return errors;
+}
+
+// Function to send errors to the report API
+async function sendErrorsToReport(
+  results: TaskResult[], 
+  stage: string,
+  repository: RepositoryInfo
+): Promise<void> {
+  try {
+    const detailedErrors = parseDetailedErrors(results);
+    
+    if (detailedErrors.length === 0) {
+      return; // No errors to report
+    }
+    
+    const sessionId = `${repository.owner}-${repository.repo}-${Date.now()}`;
+    
+    // Count errors and warnings
+    const totalErrors = detailedErrors.filter(e => e.severity === 'error').length;
+    const totalWarnings = detailedErrors.filter(e => e.severity === 'warning').length;
+    
+    // Create summary statistics
+    const byTask: Record<string, number> = {};
+    const byType: Record<string, number> = {};
+    
+    for (const error of detailedErrors) {
+      byTask[error.taskName] = (byTask[error.taskName] || 0) + 1;
+      byType[error.errorType] = (byType[error.errorType] || 0) + 1;
+    }
+    
+    const errorCollection: ErrorCollection = {
+      sessionId,
+      repository,
+      totalErrors,
+      totalWarnings,
+      totalDuration: results.reduce((sum, r) => sum + r.duration, 0),
+      stage,
+      errors: detailedErrors,
+      summary: {
+        byTask,
+        byType
+      }
+    };
+    
+    // Get the API endpoint from environment or use default
+    const apiEndpoint = process.env.REPORT_API_URL || 'http://localhost:3000/api/report';
+    
+    console.log(chalk.blue('\n📤 Sending error data to analysis server...'));
+    
+    const response = await fetch(apiEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(errorCollection)
+    });
+    
+    if (response.ok) {
+      const result = await response.json();
+      console.log(chalk.green('✅ Error data sent successfully'));
+      
+      // Display insights from the server
+      if (result.insights && result.insights.length > 0) {
+        console.log(chalk.cyan('\n🔍 Analysis Insights:'));
+        for (const insight of result.insights) {
+          console.log(chalk.cyan(`  • ${insight}`));
+        }
+      }
+      
+      if (result.suggestions && result.suggestions.length > 0) {
+        console.log(chalk.yellow('\n💡 Suggestions:'));
+        for (const suggestion of result.suggestions) {
+          console.log(chalk.yellow(`  • ${suggestion}`));
+        }
+      }
+      
+      // Display priority breakdown if available
+      if (result.priority) {
+        console.log(chalk.magenta('\n📊 Priority Breakdown:'));
+        console.log(chalk.red(`  High: ${result.priority.high}`));
+        console.log(chalk.yellow(`  Medium: ${result.priority.medium}`));
+        console.log(chalk.green(`  Low: ${result.priority.low}`));
+      }
+      
+    } else {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      console.log(chalk.red('❌ Failed to send error data:'), errorText);
+    }
+    
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.log(chalk.red('❌ Error sending data to server:'), errorMessage);
+    
+    // Don't fail the entire process if reporting fails
+    if (process.env.NODE_ENV === 'development') {
+      console.log(chalk.gray('  (Error reporting failed, but continuing with tests)'));
+    }
   }
 }
 
@@ -282,11 +591,8 @@ async function runWebsiteTests(): Promise<TaskResult> {
     // Test 5: Check for JavaScript errors in critical actions
     try {
       // Test clicking primary buttons/links (if any)
-      // Original: const clickableElements = await page.$('button, a[href], [role="button"]');
-      // **Correction: Use page.$$() to get an array of ElementHandle objects.**
       const clickableElements = await page.$$('button, a[href], [role="button"]');
       
-      // The rest of the logic relies on clickableElements being an array.
       if (clickableElements && clickableElements.length > 0) {
         // Just test the first few to avoid long test times
         const maxElements = Math.min(3, clickableElements.length);
@@ -535,7 +841,7 @@ export async function cmdTest(args: TestArgs = {}): Promise<void> {
   
   try {
     const config = loadConfig();
-    const stage = args.stage;
+    const stage = args.stage || 'default';
     const runAll = args.all;
     
     // Determine which tasks to run
@@ -640,6 +946,24 @@ export async function cmdTest(args: TestArgs = {}): Promise<void> {
           if (errorLines.length > 20) {
             console.log(chalk.gray(`  ... and ${errorLines.length - 20} more lines`));
           }
+        }
+      }
+      
+      // **NEW: Send errors to report API if there are failures**
+      try {
+        const repository = await getRepositoryInfo();
+        
+        // Only send to report API if we have valid repository info
+        if (repository.owner !== 'unknown' && repository.repo !== 'unknown') {
+          await sendErrorsToReport(results, stage, repository);
+        } else {
+          console.log(chalk.yellow('\n⚠️  Could not determine repository info - skipping error reporting'));
+        }
+      } catch (reportError) {
+        // Don't fail the entire process if error reporting fails
+        console.log(chalk.yellow('⚠️  Error reporting failed, but continuing...'));
+        if (process.env.NODE_ENV === 'development') {
+          console.log(chalk.gray(`   ${reportError instanceof Error ? reportError.message : 'Unknown error'}`));
         }
       }
       
