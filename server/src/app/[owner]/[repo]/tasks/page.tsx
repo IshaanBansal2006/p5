@@ -7,11 +7,29 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { SquareCheck as CheckSquare, Square, Clock, User, Plus, Zap, Filter, Calendar, MessageSquare } from "lucide-react";
-import { useState } from "react";
+import { SquareCheck as CheckSquare, Square, Clock, User, Plus, Zap, Filter, Calendar, MessageSquare, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import RepoLayout from "@/components/RepoLayout";
+
+// Task interface definition
+interface Task {
+  id: string;
+  title: string;
+  description: string;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  status: 'todo' | 'in-progress' | 'completed' | 'cancelled';
+  assignee: string;
+  reporter: string;
+  dueDate: string;
+  createdAt: string;
+  updatedAt: string;
+  tags: string[];
+  comments: any[];
+  completed: boolean;
+  checked: boolean;
+}
 
 const Tasks = () => {
   const params = useParams();
@@ -22,6 +40,9 @@ const Tasks = () => {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterAssignee, setFilterAssignee] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [newTaskData, setNewTaskData] = useState({
     title: "",
@@ -32,68 +53,59 @@ const Tasks = () => {
     comments: ""
   });
 
-  const [tasks, setTasks] = useState([
-    {
-      id: "T-45",
-      title: "Implement user authentication flow",
-      description: "Set up JWT-based auth with login/register/logout functionality",
-      priority: "high",
-      status: "in-progress",
-      assignee: "alex_dev",
-      dueDate: "2024-01-15",
-      tags: ["auth", "frontend", "backend"],
-      completed: false,
-      checked: false
-    },
-    {
-      id: "T-44",
-      title: "Design responsive dashboard layout",
-      description: "Create mobile-first responsive design for main dashboard",
-      priority: "medium",
-      status: "todo",
-      assignee: "sarah_codes",
-      dueDate: "2024-01-18",
-      tags: ["ui", "responsive", "design"],
-      completed: false,
-      checked: false
-    },
-    {
-      id: "T-43",
-      title: "Setup CI/CD pipeline",
-      description: "Configure GitHub Actions for automated testing and deployment",
-      priority: "high",
-      status: "completed",
-      assignee: "mike_builds",
-      dueDate: "2024-01-12",
-      tags: ["devops", "ci-cd", "automation"],
-      completed: true,
-      checked: false
-    },
-    {
-      id: "T-42",
-      title: "Optimize database queries",
-      description: "Review and optimize slow queries identified in performance monitoring",
-      priority: "medium",
-      status: "in-progress",
-      assignee: "jenny_test",
-      dueDate: "2024-01-20",
-      tags: ["database", "performance", "optimization"],
-      completed: false,
-      checked: false
-    },
-    {
-      id: "T-41",
-      title: "Write API documentation",
-      description: "Document all REST endpoints with examples and response schemas",
-      priority: "low",
-      status: "todo",
-      assignee: "tom_ui",
-      dueDate: "2024-01-25",
-      tags: ["documentation", "api", "specs"],
-      completed: false,
-      checked: false
+  // Fetch tasks from Redis
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        console.log('Fetching tasks for:', owner, repo);
+        
+        const url = `/api/addTasks?owner=${owner}&repo=${repo}`;
+        console.log('Fetching from URL:', url);
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        console.log('Response status:', response.status);
+        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Response error text:', errorText);
+          throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+        }
+        
+        const data = await response.json();
+        console.log('Fetched data:', data);
+        
+        if (data.tasks && Array.isArray(data.tasks)) {
+          setTasks(data.tasks);
+          console.log('Successfully set tasks:', data.tasks.length);
+        } else {
+          console.error('Invalid data format:', data);
+          setError('Invalid data format received from server');
+        }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+        setError(errorMessage);
+        console.error('Error fetching tasks:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (owner && repo) {
+      console.log('Starting fetch for:', owner, repo);
+      fetchTasks();
+    } else {
+      console.log('Missing owner or repo:', { owner, repo });
     }
-  ]);
+  }, [owner, repo]);
 
   const taskStats = [
     { icon: CheckSquare, label: "Completed", value: tasks.filter(t => t.status === "completed").length.toString(), color: "text-green-500" },
@@ -146,34 +158,59 @@ const Tasks = () => {
     );
   };
 
-  const handleNewTask = () => {
+  const handleNewTask = async () => {
     if (!newTaskData.title.trim()) {
       return;
     }
 
-    const newTask = {
-      id: `T-${Math.floor(Math.random() * 1000)}`,
-      title: newTaskData.title,
-      description: newTaskData.description,
-      priority: newTaskData.priority,
-      status: "todo",
-      assignee: newTaskData.assignee || "unassigned",
-      dueDate: newTaskData.dueDate,
-      tags: [],
-      completed: false,
-      checked: false
-    };
+    try {
+      const response = await fetch('/api/addTasks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          owner,
+          repo,
+          tasks: [{
+            title: newTaskData.title,
+            description: newTaskData.description,
+            priority: newTaskData.priority,
+            status: "todo",
+            assignee: newTaskData.assignee || "unassigned",
+            reporter: "current_user", // In a real app, this would be the logged-in user
+            dueDate: newTaskData.dueDate,
+            tags: []
+          }]
+        })
+      });
 
-    setTasks(prevTasks => [newTask, ...prevTasks]);
-    setNewTaskData({
-      title: "",
-      description: "",
-      priority: "medium",
-      assignee: "",
-      dueDate: "",
-      comments: ""
-    });
-    setShowNewTask(false);
+      if (!response.ok) {
+        throw new Error('Failed to create task');
+      }
+
+      const data = await response.json();
+      
+      // Refresh tasks from server
+      const refreshResponse = await fetch(`/api/addTasks?owner=${owner}&repo=${repo}`);
+      if (refreshResponse.ok) {
+        const refreshData = await refreshResponse.json();
+        setTasks(refreshData.tasks || []);
+      }
+
+      setNewTaskData({
+        title: "",
+        description: "",
+        priority: "medium",
+        assignee: "",
+        dueDate: "",
+        comments: ""
+      });
+      setShowNewTask(false);
+    } catch (error) {
+      console.error('Error creating task:', error);
+      setError('Failed to create task');
+    }
   };
 
   const getPriorityColor = (priority: string) => {
@@ -222,6 +259,33 @@ const Tasks = () => {
   });
 
   const assignees = [...new Set(tasks.map(task => task.assignee))];
+
+  if (loading) {
+    return (
+      <RepoLayout>
+        <div className="flex items-center justify-center py-20">
+          <div className="flex items-center gap-3">
+            <Loader2 className="w-6 h-6 animate-spin" />
+            <span>Loading tasks...</span>
+          </div>
+        </div>
+      </RepoLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <RepoLayout>
+        <div className="text-center py-20">
+          <h2 className="text-2xl font-bold mb-2">Error Loading Tasks</h2>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>
+            Try Again
+          </Button>
+        </div>
+      </RepoLayout>
+    );
+  }
 
   return (
     <RepoLayout>
