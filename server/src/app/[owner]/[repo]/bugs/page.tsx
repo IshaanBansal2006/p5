@@ -12,6 +12,8 @@ import { Bug, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Clock, Zap
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import RepoLayout from "@/components/RepoLayout";
+import { ContributorSelect } from "@/components/ui/contributor-select";
+import { ContributorDisplay } from "@/components/ui/contributor-display";
 
 // Bug interface definition
 interface Bug {
@@ -490,12 +492,13 @@ const RepoBugs = () => {
                           </Select>
                         </div>
                         <div>
-                          <Label htmlFor="assignee">Assignee</Label>
-                          <Input
-                            id="assignee"
+                          <ContributorSelect
                             value={newBugData.assignee}
-                            onChange={(e) => setNewBugData(prev => ({ ...prev, assignee: e.target.value }))}
-                            placeholder="Enter assignee"
+                            onChange={(value) => setNewBugData(prev => ({ ...prev, assignee: value }))}
+                            placeholder="Select or type assignee"
+                            label="Assignee (Optional)"
+                            owner={owner as string}
+                            repo={repo as string}
                           />
                         </div>
                       </div>
@@ -675,7 +678,14 @@ const RepoBugs = () => {
                         <div className={`flex items-center gap-4 text-sm text-muted-foreground ${bug.status === "resolved" || bug.status === "closed" ? "line-through" : ""}`}>
                           <span>Reported by {bug.reporter}</span>
                           <span>•</span>
-                          <span>Assigned to {bug.assignee}</span>
+                          <div className="flex items-center gap-2">
+                            <span>Assigned to</span>
+                            <ContributorDisplay
+                              assignee={bug.assignee}
+                              owner={owner as string}
+                              repo={repo as string}
+                            />
+                          </div>
                           <span>•</span>
                           <span>{new Date(bug.createdAt).toLocaleDateString()}</span>
                         </div>
