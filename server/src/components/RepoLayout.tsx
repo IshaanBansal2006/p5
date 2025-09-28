@@ -5,15 +5,40 @@ import Link from "next/link";
 import Image from "next/image";
 import { ChartBar as BarChart3, Bug, SquareCheck as CheckSquare, Github, Star, GitFork } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useState, useEffect } from "react";
 
 interface RepoLayoutProps {
   children: React.ReactNode;
+}
+
+interface RepoData {
+  stargazers_count: number;
+  forks_count: number;
 }
 
 const RepoLayout = ({ children }: RepoLayoutProps) => {
   const params = useParams();
   const pathname = usePathname();
   const { owner, repo } = params;
+  const [repoData, setRepoData] = useState<RepoData | null>(null);
+
+  useEffect(() => {
+    const fetchRepoData = async () => {
+      try {
+        const response = await fetch(`/api/repo-info?owner=${owner}&repo=${repo}`);
+        if (response.ok) {
+          const data = await response.json();
+          setRepoData(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch repo data:', error);
+      }
+    };
+
+    if (owner && repo) {
+      fetchRepoData();
+    }
+  }, [owner, repo]);
 
   const tabs = [
     { id: "stats", label: "Stats", icon: BarChart3, path: `/${owner}/${repo}` },
@@ -66,13 +91,13 @@ const RepoLayout = ({ children }: RepoLayoutProps) => {
                 <div className="flex items-center gap-4 mt-3">
                   <div className="flex items-center gap-1">
                     <Star className="w-4 h-4" />
-                    <span className="text-sm">23</span>
+                    <span className="text-sm">{repoData?.stargazers_count ?? '0'}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <GitFork className="w-4 h-4" />
-                    <span className="text-sm">7</span>
+                    <span className="text-sm">{repoData?.forks_count ?? '0'}</span>
                   </div>
-                  <Badge className="bg-green-500/20 text-green-500">
+                  <Badge className="bg-green-500/20 text-green-500 hover:bg-green-500/20">
                     P5 Enabled
                   </Badge>
                 </div>

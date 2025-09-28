@@ -204,7 +204,7 @@ const RepoStats = () => {
     };
   });
 
-  // Process recent commits
+  // Process recent commits (GitHub API returns most recent first)
   const recentCommits = statsData.recentCommitHistory.slice(0, 8).map(commit => ({
     author: commit.author,
     message: commit.message,
@@ -519,7 +519,9 @@ const RepoStats = () => {
                       </div>
                       <div>
                         <p className="font-medium text-sm">{contributor.name}</p>
-                        <p className="text-xs text-muted-foreground">{contributor.commits} commits</p>
+                        <p className="text-xs text-muted-foreground">
+                          {contributor.commits} commits • +{contributor.linesAdded} -{contributor.linesRemoved}
+                        </p>
                       </div>
                     </div>
                     <div className="text-right">

@@ -59,40 +59,16 @@ const Tasks = () => {
       try {
         setLoading(true);
         setError(null);
-        console.log('Fetching tasks for:', owner, repo);
-        
-        const url = `/api/addTasks?owner=${owner}&repo=${repo}`;
-        console.log('Fetching from URL:', url);
-        
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-        
-        console.log('Response status:', response.status);
-        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+        const response = await fetch(`/api/addTasks?owner=${owner}&repo=${repo}`);
         
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Response error text:', errorText);
-          throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+          throw new Error('Failed to fetch tasks');
         }
         
         const data = await response.json();
-        console.log('Fetched data:', data);
-        
-        if (data.tasks && Array.isArray(data.tasks)) {
-          setTasks(data.tasks);
-          console.log('Successfully set tasks:', data.tasks.length);
-        } else {
-          console.error('Invalid data format:', data);
-          setError('Invalid data format received from server');
-        }
+        setTasks(data.tasks || []);
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'An error occurred';
-        setError(errorMessage);
+        setError(err instanceof Error ? err.message : 'An error occurred');
         console.error('Error fetching tasks:', err);
       } finally {
         setLoading(false);
@@ -100,10 +76,7 @@ const Tasks = () => {
     };
 
     if (owner && repo) {
-      console.log('Starting fetch for:', owner, repo);
       fetchTasks();
-    } else {
-      console.log('Missing owner or repo:', { owner, repo });
     }
   }, [owner, repo]);
 

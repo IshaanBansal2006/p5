@@ -135,7 +135,7 @@ export async function GET(request: NextRequest) {
       octokit.rest.repos.listContributors({ owner, repo, per_page: 100 })
     ]);
 
-    // Process commit history for changelog
+    // Process commit history for changelog (commits are already in reverse chronological order from GitHub API)
     const commitHistory = commits.data.map(commit => ({
       sha: commit.sha,
       author: commit.commit.author?.name || commit.author?.login || 'Unknown',
@@ -180,6 +180,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Sort detailed commits by date (most recent first) to ensure correct order
+    detailedCommits.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
     // Process time series data - total lines of code over commits in chronological order
     const timeSeriesData: TimeSeriesData[] = [];
     let cumulativeLines = 0;
@@ -201,6 +204,45 @@ export async function GET(request: NextRequest) {
     // Calculate contributor statistics
     const contributorMap = new Map<string, ContributorStats>();
 
+    // First, process detailed commits to get accurate additions/deletions
+    for (const commit of detailedCommits) {
+      let author = commit.author;
+      let avatarUrl = undefined;
+      
+      // Find the original commit data to get avatar URL
+      const originalCommit = commits.data.find(c => c.sha === commit.sha);
+      if (originalCommit?.author?.avatar_url) {
+        avatarUrl = originalCommit.author.avatar_url;
+      }
+      
+      // Filter out system users and normalize names
+      if (author === 'root' || author === 'noreply@github.com' || author === 'GitHub' || 
+          author.toLowerCase().includes('bot') || author.toLowerCase().includes('action')) {
+        author = 'System';
+        avatarUrl = undefined;
+      }
+      
+      const existing = contributorMap.get(author) || {
+        name: author,
+        commits: 0,
+        additions: 0,
+        deletions: 0,
+        branches: 0,
+        merges: 0,
+        avatar_url: avatarUrl
+      };
+
+      existing.commits += 1;
+      existing.additions += commit.additions;
+      existing.deletions += commit.deletions;
+      if (commit.message.toLowerCase().includes('merge')) {
+        existing.merges += 1;
+      }
+
+      contributorMap.set(author, existing);
+    }
+
+    // Then process all commits to get total commit counts (including those not in detailedCommits)
     for (const commit of commits.data) {
       let author = commit.commit.author?.name || commit.author?.login || 'Unknown';
       let avatarUrl = commit.author?.avatar_url;
@@ -222,9 +264,12 @@ export async function GET(request: NextRequest) {
         avatar_url: avatarUrl
       };
 
-      existing.commits += 1;
-      if (commit.commit.message.toLowerCase().includes('merge')) {
-        existing.merges += 1;
+      // Only increment commits if we haven't already processed this commit in detailedCommits
+      if (!detailedCommits.some(dc => dc.sha === commit.sha)) {
+        existing.commits += 1;
+        if (commit.commit.message.toLowerCase().includes('merge')) {
+          existing.merges += 1;
+        }
       }
 
       contributorMap.set(author, existing);
@@ -277,12 +322,17 @@ export async function GET(request: NextRequest) {
         curr.commits < min.commits ? curr : min, contributorStats[0] || { name: 'None', commits: 0 })
     };
 
+    // Calculate total lines of code from detailed commits
+    const totalLinesOfCode = detailedCommits.reduce((total, commit) => {
+      return total + commit.additions - commit.deletions;
+    }, 0);
+
     // Calculate current stats
     const currentStats = {
       branches: branches.data.length,
       totalCommits: commits.data.length,
       totalContributors: contributors.data.length,
-      totalLinesOfCode: repoData.data.size || 0
+      totalLinesOfCode: Math.max(totalLinesOfCode, 0) // Ensure non-negative
     };
 
     // Get historical data for percent change calculation (12 hours ago vs now)
