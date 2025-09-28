@@ -82,15 +82,15 @@ const Documentation = () => {
                 <div className="space-y-4">
                   <div className="flex items-center gap-4">
                     <Badge className="bg-primary/20 text-primary">1</Badge>
-                    <code className="text-primary font-mono bg-background/20 px-3 py-1 rounded">npm install -g p5</code>
+                    <code className="text-primary font-mono bg-background/20 px-3 py-1 rounded">npm i player5</code>
                   </div>
                   <div className="flex items-center gap-4">
                     <Badge className="bg-primary/20 text-primary">2</Badge>
-                    <code className="text-primary font-mono bg-background/20 px-3 py-1 rounded">cd your-project && p5 init</code>
+                    <code className="text-primary font-mono bg-background/20 px-3 py-1 rounded">cd your-project && npx p5 init</code>
                   </div>
                   <div className="flex items-center gap-4">
                     <Badge className="bg-primary/20 text-primary">3</Badge>
-                    <code className="text-primary font-mono bg-background/20 px-3 py-1 rounded">p5 test</code>
+                    <code className="text-primary font-mono bg-background/20 px-3 py-1 rounded">npx p5 test</code>
                   </div>
                 </div>
               </div>
@@ -150,7 +150,7 @@ const Documentation = () => {
                 <div>
                   <h3 className="text-xl font-semibold mb-3">Global Installation (Recommended)</h3>
                   <div className="bg-background/20 rounded-lg p-4 border border-border/20">
-                    <code className="text-primary font-mono">npm install -g p5</code>
+                    <code className="text-primary font-mono">npm i player5</code>
                   </div>
                   <p className="text-sm text-muted-foreground mt-2">
                     Installs P5 globally so you can use it in any project
@@ -160,7 +160,7 @@ const Documentation = () => {
                 <div>
                   <h3 className="text-xl font-semibold mb-3">Local Installation</h3>
                   <div className="bg-background/20 rounded-lg p-4 border border-border/20">
-                    <code className="text-primary font-mono">npm install --save-dev p5</code>
+                    <code className="text-primary font-mono">npm install --save-dev player5</code>
                   </div>
                   <p className="text-sm text-muted-foreground mt-2">
                     Installs P5 as a development dependency in your project
@@ -170,7 +170,7 @@ const Documentation = () => {
                 <div>
                   <h3 className="text-xl font-semibold mb-3">Verify Installation</h3>
                   <div className="bg-background/20 rounded-lg p-4 border border-border/20">
-                    <code className="text-primary font-mono">p5 --version</code>
+                    <code className="text-primary font-mono">player5 --version</code>
                   </div>
                 </div>
               </div>
@@ -189,7 +189,7 @@ const Documentation = () => {
                 <div>
                   <h3 className="text-xl font-semibold mb-3">Initialize P5 in Your Project</h3>
                   <div className="bg-background/20 rounded-lg p-4 border border-border/20 mb-3">
-                    <code className="text-primary font-mono">p5 init</code>
+                    <code className="text-primary font-mono">npx p5 init</code>
                   </div>
                   <p className="text-muted-foreground mb-4">
                     This creates a <code className="text-primary bg-background/20 px-2 py-1 rounded">.p5config.json</code> file with default settings.
