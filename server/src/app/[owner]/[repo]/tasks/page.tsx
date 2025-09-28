@@ -754,25 +754,40 @@ const Tasks = () => {
           </div>
         </Card>
 
-        {/* P5 Automation Status */}
-        <Card className="p-6 bg-gradient-card border-border/40">
-          <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
-            <Zap className="w-5 h-5 text-primary" />
-            P5 Automation Status
-          </h3>
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-background/20">
-                <span className="text-sm">Build Break Detection</span>
-                <span className="inline-block bg-green-500/20 text-green-500 px-2 py-1 text-xs rounded">Active</span>
+          {/* P5 Automation Status */}
+          <Card className="p-6 bg-gradient-card border-border/40">
+            <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+              <Zap className="w-5 h-5 text-primary" />
+              P5 Automation Status
+            </h3>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-background/20">
+                  <span className="text-sm">Task Management</span>
+                  <span className="inline-block bg-green-500/20 text-green-500 px-2 py-1 text-xs rounded">Active</span>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-background/20">
+                  <span className="text-sm">Bug Detection & AI Processing</span>
+                  <span className="inline-block bg-green-500/20 text-green-500 px-2 py-1 text-xs rounded">Active</span>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-background/20">
+                  <span className="text-sm">Repository Statistics</span>
+                  <span className="inline-block bg-green-500/20 text-green-500 px-2 py-1 text-xs rounded">Active</span>
+                </div>
               </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-background/20">
-                <span className="text-sm">Auto Test Runner</span>
-                <span className="inline-block bg-green-500/20 text-green-500 px-2 py-1 text-xs rounded">Active</span>
-              </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-background/20">
-                <span className="text-sm">Commit Validation</span>
-                <span className="inline-block bg-green-500/20 text-green-500 px-2 py-1 text-xs rounded">Active</span>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-background/20">
+                  <span className="text-sm">Devpost Generation</span>
+                  <span className="inline-block bg-green-500/20 text-green-500 px-2 py-1 text-xs rounded">Active</span>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-background/20">
+                  <span className="text-sm">README Sync</span>
+                  <span className="inline-block bg-green-500/20 text-green-500 px-2 py-1 text-xs rounded">Active</span>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-background/20">
+                  <span className="text-sm">CLI Integration</span>
+                  <span className="inline-block bg-green-500/20 text-green-500 px-2 py-1 text-xs rounded">Active</span>
+                </div>
               </div>
             </div>
             <div className="space-y-4">
