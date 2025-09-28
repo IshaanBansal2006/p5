@@ -102,11 +102,12 @@ export const redis = {
   },
   async del(key: string) {
     const client = await getRedisClient();
-    if (!client) return;
+    if (!client) return 0;
     try {
-      await client.del(key);
+      return await client.del(key);
     } catch (error) {
       console.warn('Redis del error:', error);
+      return 0;
     }
   },
   async keys(pattern: string) {
