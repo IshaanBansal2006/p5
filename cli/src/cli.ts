@@ -5,7 +5,6 @@ import { cmdReadmeSync } from './commands/readmeSync.js';
 import { cmdInit } from './commands/init.js';
 import { cmdTest } from './commands/test.js';
 import { cmdDashboard } from './commands/dashboard.js';
-import { webhookCommand } from './commands/webhook.js';
 
 export async function runCLI(): Promise<void> {
   await yargs(hideBin(process.argv))
@@ -118,7 +117,6 @@ export async function runCLI(): Promise<void> {
         await cmdReadmeSync(args);
       }
     )
-    .command(webhookCommand)
     .demandCommand(1, 'You need at least one command before moving on')
     .help()
     .argv;
