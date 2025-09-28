@@ -64,6 +64,7 @@ interface StatsData {
   totalCommits: { current: number; percentChange: number };
   totalContributors: { current: number; percentChange: number };
   totalLinesOfCode: { current: number; percentChange: number };
+  commitsAnalyzed: number;
 }
 
 export async function GET(request: NextRequest) {
@@ -103,13 +104,13 @@ export async function GET(request: NextRequest) {
         });
 
         if (commits.data.length > 0) {
-          const lastCommitDate = commits.data[0].commit.author?.date || 
-                               commits.data[0].commit.committer?.date;
-          
+          const lastCommitDate = commits.data[0].commit.author?.date ||
+            commits.data[0].commit.committer?.date;
+
           if (lastCommitDate) {
             const lastCommitTime = new Date(lastCommitDate).getTime();
             const cachedTime = new Date(cachedGeneratedTime).getTime();
-            
+
             // Only regenerate if last commit is newer than cached generation time
             shouldRegenerate = lastCommitTime > cachedTime;
           }
@@ -145,15 +146,16 @@ export async function GET(request: NextRequest) {
     }));
 
     // Get detailed commit stats
+    const commitsToAnalyze = 20; // Configurable number of commits to analyze
     const detailedCommits: CommitData[] = [];
-    for (const commit of commits.data.slice(0, 20)) { // Limit to recent 20 commits
+    for (const commit of commits.data.slice(0, commitsToAnalyze)) {
       try {
         const commitDetail = await octokit.rest.repos.getCommit({
           owner,
           repo,
           ref: commit.sha
         });
-        
+
         const stats = commitDetail.data.stats;
         detailedCommits.push({
           sha: commit.sha,
@@ -169,36 +171,27 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Process time series data (last 30 days)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // Process time series data - total lines of code over commits in chronological order
+    const timeSeriesData: TimeSeriesData[] = [];
+    let cumulativeLines = 0;
     
-    const timeSeriesMap = new Map<string, TimeSeriesData>();
+    // Sort commits by date (oldest first) for cumulative calculation
+    const sortedCommits = detailedCommits.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     
-    for (const commit of commits.data) {
-      const commitDate = new Date(commit.commit.author?.date || new Date());
-      if (commitDate >= thirtyDaysAgo) {
-        const dateKey = commitDate.toISOString().split('T')[0];
-        const existing = timeSeriesMap.get(dateKey) || {
-          date: dateKey,
-          commits: 0,
-          linesAdded: 0,
-          linesDeleted: 0,
-          contributors: []
-        };
-        
-        existing.commits += 1;
-        existing.contributors.push(commit.commit.author?.name || commit.author?.login || 'Unknown');
-        timeSeriesMap.set(dateKey, existing);
-      }
+    for (const commit of sortedCommits) {
+      cumulativeLines += commit.additions - commit.deletions;
+      timeSeriesData.push({
+        date: commit.date,
+        commits: 1,
+        linesAdded: commit.additions,
+        linesDeleted: commit.deletions,
+        contributors: [commit.author]
+      });
     }
-
-    const timeSeriesData = Array.from(timeSeriesMap.values())
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     // Calculate contributor statistics
     const contributorMap = new Map<string, ContributorStats>();
-    
+
     for (const commit of commits.data) {
       const author = commit.commit.author?.name || commit.author?.login || 'Unknown';
       const existing = contributorMap.get(author) || {
@@ -209,12 +202,12 @@ export async function GET(request: NextRequest) {
         branches: 0,
         merges: 0
       };
-      
+
       existing.commits += 1;
       if (commit.commit.message.toLowerCase().includes('merge')) {
         existing.merges += 1;
       }
-      
+
       contributorMap.set(author, existing);
     }
 
@@ -226,10 +219,10 @@ export async function GET(request: NextRequest) {
         sha: branch.name,
         per_page: 1
       });
-      
+
       if (branchCommits.data.length > 0) {
-        const author = branchCommits.data[0].commit.author?.name || 
-                     branchCommits.data[0].author?.login || 'Unknown';
+        const author = branchCommits.data[0].commit.author?.name ||
+          branchCommits.data[0].author?.login || 'Unknown';
         const existing = contributorMap.get(author) || {
           name: author,
           commits: 0,
@@ -247,13 +240,13 @@ export async function GET(request: NextRequest) {
 
     // Calculate awards
     const awards: Awards = {
-      biggestCommitter: contributorStats.reduce((max, curr) => 
+      biggestCommitter: contributorStats.reduce((max, curr) =>
         curr.commits > max.commits ? curr : max, contributorStats[0] || { name: 'None', commits: 0 }),
-      biggestMerger: contributorStats.reduce((max, curr) => 
+      biggestMerger: contributorStats.reduce((max, curr) =>
         curr.merges > max.merges ? curr : max, contributorStats[0] || { name: 'None', merges: 0 }),
-      biggestBrancher: contributorStats.reduce((max, curr) => 
+      biggestBrancher: contributorStats.reduce((max, curr) =>
         curr.branches > max.branches ? curr : max, contributorStats[0] || { name: 'None', branches: 0 }),
-      leastContributor: contributorStats.reduce((min, curr) => 
+      leastContributor: contributorStats.reduce((min, curr) =>
         curr.commits < min.commits ? curr : min, contributorStats[0] || { name: 'None', commits: 0 })
     };
 
@@ -265,7 +258,7 @@ export async function GET(request: NextRequest) {
       totalLinesOfCode: repoData.data.size || 0
     };
 
-    // Get historical data for percent change calculation
+    // Get historical data for percent change calculation (12 hours ago vs now)
     const historicalData = await redis.get(historicalKey);
     let percentChanges = {
       branches: 0,
@@ -299,7 +292,8 @@ export async function GET(request: NextRequest) {
       branches: { current: currentStats.branches, percentChange: percentChanges.branches },
       totalCommits: { current: currentStats.totalCommits, percentChange: percentChanges.totalCommits },
       totalContributors: { current: currentStats.totalContributors, percentChange: percentChanges.totalContributors },
-      totalLinesOfCode: { current: currentStats.totalLinesOfCode, percentChange: percentChanges.totalLinesOfCode }
+      totalLinesOfCode: { current: currentStats.totalLinesOfCode, percentChange: percentChanges.totalLinesOfCode },
+      commitsAnalyzed: commitsToAnalyze
     };
 
     const response = {
