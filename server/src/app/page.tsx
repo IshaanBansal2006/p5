@@ -185,18 +185,11 @@ const Home = () => {
           </div>
         </section>
 
-        {/* Footer */}
-        <footer className="border-t border-border/40 py-12">
-          <div className="container mx-auto px-6 text-center">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <Image src="/p5-logo.png" alt="player5" width={32} height={32} className="w-8 h-8" />
-              <code className="text-xl font-bold" style={{ fontFamily: 'Fira Code, monospace' }}>
-                <span className="font-black bg-gradient-primary bg-clip-text text-transparent">player5</span>
-              </code>
-            </div>
-            <p className="text-muted-foreground">
-              Making hackathon development faster and less painful, one commit at a time.
-            </p>
+      {/* Footer */}
+      <footer className="border-t border-border/40 py-12">
+        <div className="container mx-auto px-6 text-center">
+          <div className="flex items-center justify-center gap-3 mb-4">
+              <Image src="/p5-logo.png" alt="Player5" width={48} height={48} className="w-12 h-12" />
           </div>
         </footer>
       </div>

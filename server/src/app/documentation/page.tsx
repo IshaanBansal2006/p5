@@ -13,12 +13,7 @@ const Documentation = () => {
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Link href="/" className="flex items-center gap-3">
-                <Image src="/p5-logo.png" alt="player5" width={40} height={40} className="w-10 h-10" />
-                <code className="text-2xl font-bold" style={{ fontFamily: 'Fira Code, monospace' }}>
-                  <span className="font-black bg-gradient-primary bg-clip-text text-transparent">player5</span>
-                </code>
-              </Link>
+              <Image src="/p5-logo.png" alt="Player5" width={56} height={56} className="w-14 h-14" />
             </div>
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="sm">
