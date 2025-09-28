@@ -39,6 +39,8 @@ interface RepositoryData {
     checked: boolean;
   }>;
   tasks: Task[];
+  nextBugId: number;
+  nextTaskId: number;
 }
 
 interface DeleteTaskRequest {

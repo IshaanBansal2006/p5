@@ -43,6 +43,8 @@ interface Bug {
 interface RepositoryData {
   bugs: Bug[];
   tasks: Task[];
+  nextBugId: number;
+  nextTaskId: number;
 }
 
 interface AddTasksRequest {
@@ -51,9 +53,9 @@ interface AddTasksRequest {
   tasks: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'comments' | 'completed' | 'checked'>[];
 }
 
-// Generate unique task ID
-function generateTaskId(): string {
-  return `T-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+// Generate sequential task ID
+function generateTaskId(nextTaskId: number): string {
+  return `T-${nextTaskId}`;
 }
 
 
@@ -108,14 +110,24 @@ export async function POST(request: NextRequest) {
     } else {
       repositoryData = {
         bugs: [],
-        tasks: []
+        tasks: [],
+        nextBugId: 1,
+        nextTaskId: 1
       };
+    }
+
+    // Ensure counters exist for existing repositories
+    if (repositoryData.nextBugId === undefined) {
+      repositoryData.nextBugId = Math.max(1, repositoryData.bugs.length + 1);
+    }
+    if (repositoryData.nextTaskId === undefined) {
+      repositoryData.nextTaskId = Math.max(1, repositoryData.tasks.length + 1);
     }
 
     // Process and add new tasks with default values
     const currentTime = new Date().toISOString();
-    const newTasks: Task[] = tasks.map(task => ({
-      id: generateTaskId(),
+    const newTasks: Task[] = tasks.map((task, index) => ({
+      id: generateTaskId(repositoryData.nextTaskId + index),
       title: task.title.trim(),
       description: task.description || 'No description provided',
       priority: task.priority || 'medium',
@@ -129,6 +141,9 @@ export async function POST(request: NextRequest) {
       completed: (task.status || 'todo') === 'completed',
       checked: false
     }));
+
+    // Update the next task ID counter
+    repositoryData.nextTaskId += tasks.length;
 
     // Add new tasks to existing tasks
     repositoryData.tasks.push(...newTasks);

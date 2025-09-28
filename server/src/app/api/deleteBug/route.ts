@@ -39,6 +39,8 @@ interface RepositoryData {
     completed: boolean;
     checked: boolean;
   }>;
+  nextBugId: number;
+  nextTaskId: number;
 }
 
 interface DeleteBugRequest {

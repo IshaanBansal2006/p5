@@ -39,6 +39,8 @@ interface RepositoryData {
     completed: boolean;
     checked: boolean;
   }>;
+  nextBugId: number;
+  nextTaskId: number;
 }
 
 interface AddBugRequest {
@@ -47,9 +49,9 @@ interface AddBugRequest {
   bugs: Omit<Bug, 'id' | 'createdAt' | 'updatedAt' | 'checked'>[];
 }
 
-// Generate unique bug ID
-function generateBugId(): string {
-  return `#${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
+// Generate sequential bug ID
+function generateBugId(nextBugId: number): string {
+  return `#${nextBugId}`;
 }
 
 export async function POST(request: NextRequest) {
@@ -103,14 +105,24 @@ export async function POST(request: NextRequest) {
     } else {
       repositoryData = {
         bugs: [],
-        tasks: []
+        tasks: [],
+        nextBugId: 1,
+        nextTaskId: 1
       };
+    }
+
+    // Ensure counters exist for existing repositories
+    if (repositoryData.nextBugId === undefined) {
+      repositoryData.nextBugId = Math.max(1, repositoryData.bugs.length + 1);
+    }
+    if (repositoryData.nextTaskId === undefined) {
+      repositoryData.nextTaskId = Math.max(1, repositoryData.tasks.length + 1);
     }
 
     // Process and add new bugs with default values for empty fields
     const currentTime = new Date().toISOString();
-    const newBugs: Bug[] = bugs.map(bug => ({
-      id: generateBugId(),
+    const newBugs: Bug[] = bugs.map((bug, index) => ({
+      id: generateBugId(repositoryData.nextBugId + index),
       title: bug.title,
       description: bug.description?.trim() || ' ',
       severity: bug.severity || 'medium',
@@ -122,6 +134,9 @@ export async function POST(request: NextRequest) {
       labels: bug.labels || [],
       checked: false
     }));
+
+    // Update the next bug ID counter
+    repositoryData.nextBugId += bugs.length;
 
     // Add new bugs to existing bugs
     repositoryData.bugs.push(...newBugs);

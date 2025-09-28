@@ -1,13 +1,45 @@
 import { createClient } from 'redis';
 
 let redisClient: ReturnType<typeof createClient> | null = null;
+let isConnecting = false;
 
 export const getRedisClient = async () => {
-  if (redisClient) {
+  // If client exists and is connected, return it
+  if (redisClient && redisClient.isOpen) {
     return redisClient;
   }
 
+  // If we're already connecting, wait for it to complete
+  if (isConnecting) {
+    // Wait a bit and try again, but limit retries
+    let retries = 0;
+    while (isConnecting && retries < 10) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      retries++;
+    }
+    if (redisClient && redisClient.isOpen) {
+      return redisClient;
+    }
+  }
+
+  // If client exists but is not connected, try to reconnect
+  if (redisClient && !redisClient.isOpen) {
+    try {
+      await redisClient.connect();
+      return redisClient;
+    } catch (error) {
+      console.warn('Redis reconnection failed:', error);
+      redisClient = null;
+    }
+  }
+
+  // Create new client
+  isConnecting = true;
+  
   try {
+    // Add a small delay to prevent rapid connection attempts
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
     console.log('Creating Redis client with config:', {
       host: process.env.REDIS_HOST,
       port: process.env.REDIS_PORT,
@@ -31,13 +63,20 @@ export const getRedisClient = async () => {
       console.log('Redis client connected successfully');
     });
 
+    redisClient.on('end', () => {
+      console.log('Redis client disconnected');
+    });
+
     // Connect to Redis
     await redisClient.connect();
 
     return redisClient;
   } catch (error) {
     console.warn('Redis connection failed:', error);
+    redisClient = null;
     return null;
+  } finally {
+    isConnecting = false;
   }
 };
 
@@ -69,5 +108,28 @@ export const redis = {
     } catch (error) {
       console.warn('Redis del error:', error);
     }
+  },
+  async keys(pattern: string) {
+    const client = await getRedisClient();
+    if (!client) return [];
+    try {
+      return await client.keys(pattern);
+    } catch (error) {
+      console.warn('Redis keys error:', error);
+      return [];
+    }
   }
+};
+
+// Cleanup function to close Redis connection
+export const closeRedisConnection = async () => {
+  if (redisClient && redisClient.isOpen) {
+    try {
+      await redisClient.quit();
+      console.log('Redis connection closed');
+    } catch (error) {
+      console.warn('Error closing Redis connection:', error);
+    }
+  }
+  redisClient = null;
 };
