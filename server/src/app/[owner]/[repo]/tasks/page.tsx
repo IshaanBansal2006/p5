@@ -65,16 +65,23 @@ const Tasks = () => {
       try {
         setLoading(true);
         setError(null);
+        console.log(`Fetching tasks for ${owner}/${repo}`);
         const response = await fetch(`/api/addTasks?owner=${owner}&repo=${repo}`);
         
+        console.log('Response status:', response.status);
+        
         if (!response.ok) {
-          throw new Error('Failed to fetch tasks');
+          const errorData = await response.json().catch(() => ({}));
+          console.error('API Error:', errorData);
+          throw new Error(`Failed to fetch tasks: ${response.status} ${errorData.error || response.statusText}`);
         }
         
         const data = await response.json();
+        console.log('Tasks data received:', data);
         setTasks(data.tasks || []);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
+        const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+        setError(errorMessage);
         console.error('Error fetching tasks:', err);
       } finally {
         setLoading(false);
@@ -90,7 +97,6 @@ const Tasks = () => {
     { icon: CheckSquare, label: "Completed", value: tasks.filter(t => t.status === "completed").length.toString(), color: "text-green-500" },
     { icon: Square, label: "Todo", value: tasks.filter(t => t.status === "todo").length.toString(), color: "text-blue-500" },
     { icon: Clock, label: "In Progress", value: tasks.filter(t => t.status === "in-progress").length.toString(), color: "text-yellow-500" },
-    { icon: User, label: "Assigned to Me", value: "7", color: "text-purple-500" },
   ];
 
   const handleTaskClick = (taskId: string) => {
@@ -261,7 +267,7 @@ const Tasks = () => {
 
         <div className="space-y-8">
           {/* Task Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {taskStats.map((stat, index) => (
               <Card key={index} className="p-6 bg-gradient-card border-border/40 hover:border-primary/20 transition-smooth">
                 <div className="flex items-center justify-between mb-4">

@@ -176,10 +176,12 @@ export async function GET(request: NextRequest) {
     const existingData = await redis.get(key);
     
     if (!existingData) {
-      return NextResponse.json(
-        { error: `Repository ${owner}/${repo} not found. Please register it first.` },
-        { status: 404 }
-      );
+      // Return empty tasks array if repository not found
+      return NextResponse.json({
+        repository: `${owner}/${repo}`,
+        tasks: [],
+        totalTasks: 0
+      });
     }
 
     const repositoryData: RepositoryData = JSON.parse(existingData);
@@ -193,7 +195,10 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error in getTasks endpoint:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

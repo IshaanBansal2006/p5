@@ -8,6 +8,12 @@ export const getRedisClient = async () => {
   }
 
   try {
+    console.log('Creating Redis client with config:', {
+      host: process.env.REDIS_HOST,
+      port: process.env.REDIS_PORT,
+      hasPassword: !!process.env.REDIS_PASSWORD
+    });
+
     redisClient = createClient({
       username: 'default',
       password: process.env.REDIS_PASSWORD,
@@ -21,10 +27,12 @@ export const getRedisClient = async () => {
       console.warn('Redis Client Error', err);
     });
 
-    // Only connect if not in build mode
-    if (process.env.NODE_ENV !== 'production' || process.env.VERCEL_ENV !== 'production') {
-      await redisClient.connect();
-    }
+    redisClient.on('connect', () => {
+      console.log('Redis client connected successfully');
+    });
+
+    // Connect to Redis
+    await redisClient.connect();
 
     return redisClient;
   } catch (error) {
