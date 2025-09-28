@@ -96,10 +96,10 @@ const RepoLayout = ({ children }: RepoLayoutProps) => {
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center gap-3">
-              <Image src="/p5-logo.png" alt="Player5" width={32} height={32} className="w-8 h-8" />
-              <span className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                Player5
-              </span>
+              <Image src="/p5-logo.png" alt="player5" width={32} height={32} className="w-8 h-8" />
+              <code className="text-xl font-bold" style={{ fontFamily: 'Fira Code, monospace' }}>
+                <span className="font-black bg-gradient-primary bg-clip-text text-transparent">player5</span>
+              </code>
             </Link>
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="sm">

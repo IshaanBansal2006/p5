@@ -13,10 +13,12 @@ const Documentation = () => {
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Image src="/p5-logo.png" alt="Player5" width={40} height={40} className="w-10 h-10" />
-              <span className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                Player5
-              </span>
+              <Link href="/" className="flex items-center gap-3">
+                <Image src="/p5-logo.png" alt="player5" width={40} height={40} className="w-10 h-10" />
+                <code className="text-2xl font-bold" style={{ fontFamily: 'Fira Code, monospace' }}>
+                  <span className="font-black bg-gradient-primary bg-clip-text text-transparent">player5</span>
+                </code>
+              </Link>
             </div>
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="sm">
@@ -37,8 +39,10 @@ const Documentation = () => {
         <div className="max-w-4xl mx-auto">
           {/* Hero Section */}
           <div className="text-center mb-12">
-            <h1 className="text-4xl lg:text-5xl font-bold mb-4 bg-gradient-primary bg-clip-text text-transparent">
-              Player5 Documentation
+            <h1 className="text-4xl lg:text-5xl font-bold mb-4">
+              <code style={{ fontFamily: 'Fira Code, monospace' }}>
+                <span className="font-black bg-gradient-primary bg-clip-text text-transparent">player5</span>
+              </code> Documentation
             </h1>
             <p className="text-xl text-muted-foreground">
               Complete guide to streamlining your hackathon development workflow
@@ -75,10 +79,10 @@ const Documentation = () => {
                 Getting Started
               </h2>
               <p className="text-lg text-muted-foreground mb-6">
-                Player5 (P5) is designed to automate the tedious parts of hackathon development, 
+                <code className="font-bold" style={{ fontFamily: 'Fira Code, monospace' }}><span className="font-black bg-gradient-primary bg-clip-text text-transparent">player5</span></code> (P5) is designed to automate the tedious parts of hackathon development,
                 letting you focus on building amazing projects instead of managing builds, documentation, and deployments.
               </p>
-              
+
               <div className="bg-secondary/20 backdrop-blur-sm rounded-xl p-6 border border-border/40 mb-6">
                 <h3 className="text-xl font-semibold mb-4">Quick Setup</h3>
                 <div className="space-y-4">
@@ -147,7 +151,7 @@ const Documentation = () => {
                 <Download className="w-8 h-8 text-primary" />
                 Installation
               </h2>
-              
+
               <div className="space-y-6">
                 <div>
                   <h3 className="text-xl font-semibold mb-3">Global Installation (Recommended)</h3>
@@ -186,7 +190,7 @@ const Documentation = () => {
                 <Settings className="w-8 h-8 text-primary" />
                 Configuration
               </h2>
-              
+
               <div className="space-y-6">
                 <div>
                   <h3 className="text-xl font-semibold mb-3">Initialize P5 in Your Project</h3>
@@ -202,7 +206,7 @@ const Documentation = () => {
                   <h3 className="text-xl font-semibold mb-3">Configuration Options</h3>
                   <div className="bg-background/20 rounded-lg p-4 border border-border/20">
                     <pre className="text-sm text-primary font-mono">
-{`{
+                      {`{
   "buildCommand": "npm run build",
   "testCommand": "npm test",
   "autoUpdate": true,
@@ -229,7 +233,7 @@ const Documentation = () => {
                 <Terminal className="w-8 h-8 text-primary" />
                 Commands
               </h2>
-              
+
               <div className="grid gap-6">
                 {[
                   {
@@ -275,7 +279,7 @@ const Documentation = () => {
                 <Zap className="w-8 h-8 text-primary" />
                 Features
               </h2>
-              
+
               <div className="grid md:grid-cols-2 gap-6">
                 {[
                   {
