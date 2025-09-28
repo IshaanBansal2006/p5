@@ -205,7 +205,7 @@ const RepoStats = () => {
   });
 
   // Process recent commits (GitHub API returns most recent first)
-  const recentCommits = statsData.recentCommitHistory.slice(0, 8).map(commit => ({
+  const recentCommits = statsData.recentCommitHistory.map(commit => ({
     author: commit.author,
     message: commit.message,
     time: formatTimeAgo(commit.date),
@@ -227,8 +227,7 @@ const RepoStats = () => {
       linesAdded: contributor.additions,
       linesRemoved: contributor.deletions
     }))
-    .sort((a, b) => b.commits - a.commits)
-    .slice(0, 5);
+    .sort((a, b) => b.commits - a.commits);
 
   const awards = [
     {
@@ -425,7 +424,7 @@ const RepoStats = () => {
                 </Dialog>
               </div>
               <div className="space-y-4">
-                {recentCommits.slice(0, 4).map((commit, index) => (
+                {recentCommits.slice(0, 5).map((commit, index) => (
                   <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-background/20 border border-border/20">
                     <div className="flex items-center gap-3">
                       <div className={`w-3 h-3 rounded-full ${commit.status === 'success' ? 'bg-green-500' : 'bg-red-500'}`}></div>
@@ -501,7 +500,7 @@ const RepoStats = () => {
                 </Dialog>
               </div>
               <div className="space-y-4">
-                {contributors.slice(0, 5).map((contributor, index) => (
+                {contributors.map((contributor, index) => (
                   <div key={index} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center font-semibold overflow-hidden">

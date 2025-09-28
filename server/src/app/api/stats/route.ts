@@ -95,8 +95,8 @@ export async function GET(request: NextRequest) {
     if (cachedStats && cachedGeneratedTime) {
       try {
         // Get the last commit from the main branch
-        const repoData = await octokit.rest.repos.get({ owner, repo });
-        const defaultBranch = repoData.data.default_branch;
+        const cachedRepoData = await octokit.rest.repos.get({ owner, repo });
+        const defaultBranch = cachedRepoData.data.default_branch;
         const commits = await octokit.rest.repos.listCommits({
           owner,
           repo,
@@ -124,7 +124,23 @@ export async function GET(request: NextRequest) {
 
     // Return cached stats if they're still valid
     if (cachedStats && !shouldRegenerate) {
-      return NextResponse.json(JSON.parse(cachedStats));
+      try {
+        const parsedStats = JSON.parse(cachedStats);
+        return NextResponse.json(parsedStats);
+      } catch (error) {
+        console.warn('Failed to parse cached stats, clearing cache and regenerating:', error);
+        console.warn('Cached stats content:', cachedStats?.substring(0, 100) + '...');
+        
+        // Clear corrupted cache
+        try {
+          await redis.del(statsCacheKey);
+          await redis.del(statsGeneratedKey);
+        } catch (delError) {
+          console.warn('Failed to clear corrupted cache:', delError);
+        }
+        
+        // Continue to regenerate stats if cache is corrupted
+      }
     }
 
     // Fetch repository data from GitHub
@@ -146,10 +162,9 @@ export async function GET(request: NextRequest) {
       changes: 0
     }));
 
-    // Get detailed commit stats
-    const commitsToAnalyze = 20; // Configurable number of commits to analyze
+    // Get detailed commit stats for first 50 commits (mimicking debug endpoint)
     const detailedCommits: CommitData[] = [];
-    for (const commit of commits.data.slice(0, commitsToAnalyze)) {
+    for (const commit of commits.data.slice(0, 50)) {
       try {
         const commitDetail = await octokit.rest.repos.getCommit({
           owner,
@@ -162,8 +177,16 @@ export async function GET(request: NextRequest) {
         
         // Filter out system users and normalize names
         if (author === 'root' || author === 'noreply@github.com' || author === 'GitHub' || 
-            author.toLowerCase().includes('bot') || author.toLowerCase().includes('action')) {
+            author.toLowerCase().includes('bot') || author.toLowerCase().includes('action') ||
+            author === 'Unknown' || !author.trim()) {
           author = 'System';
+        } else {
+          // Normalize author names to handle variations
+          author = author.trim();
+          // If we have both name and login, prefer the name but fallback to login
+          if (commit.commit.author?.name && commit.author?.login) {
+            author = commit.commit.author.name.trim();
+          }
         }
         
         detailedCommits.push({
@@ -180,15 +203,15 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Sort detailed commits by date (most recent first) to ensure correct order
-    detailedCommits.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    // Keep commits in GitHub's original order (newest first)
+    // detailedCommits are already in the correct order from GitHub API
 
     // Process time series data - total lines of code over commits in chronological order
     const timeSeriesData: TimeSeriesData[] = [];
     let cumulativeLines = 0;
     
-    // Sort commits by date (oldest first) for cumulative calculation
-    const sortedCommits = detailedCommits.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    // Sort commits by date (oldest first) for cumulative calculation - create a copy to avoid mutating original
+    const sortedCommits = [...detailedCommits].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     
     for (const commit of sortedCommits) {
       cumulativeLines += commit.additions - commit.deletions;
@@ -201,26 +224,13 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Calculate contributor statistics
+    // Calculate contributor statistics (mimicking debug endpoint exactly)
     const contributorMap = new Map<string, ContributorStats>();
-
-    // First, process detailed commits to get accurate additions/deletions
+    
+    // First, process detailed commits for accurate stats
     for (const commit of detailedCommits) {
-      let author = commit.author;
-      let avatarUrl = undefined;
-      
-      // Find the original commit data to get avatar URL
-      const originalCommit = commits.data.find(c => c.sha === commit.sha);
-      if (originalCommit?.author?.avatar_url) {
-        avatarUrl = originalCommit.author.avatar_url;
-      }
-      
-      // Filter out system users and normalize names
-      if (author === 'root' || author === 'noreply@github.com' || author === 'GitHub' || 
-          author.toLowerCase().includes('bot') || author.toLowerCase().includes('action')) {
-        author = 'System';
-        avatarUrl = undefined;
-      }
+      const author = commit.author;
+      if (author === 'System') continue; // Skip system commits
       
       const existing = contributorMap.get(author) || {
         name: author,
@@ -229,30 +239,39 @@ export async function GET(request: NextRequest) {
         deletions: 0,
         branches: 0,
         merges: 0,
-        avatar_url: avatarUrl
+        avatar_url: undefined
       };
 
       existing.commits += 1;
       existing.additions += commit.additions;
       existing.deletions += commit.deletions;
+      
       if (commit.message.toLowerCase().includes('merge')) {
         existing.merges += 1;
       }
 
       contributorMap.set(author, existing);
     }
-
-    // Then process all commits to get total commit counts (including those not in detailedCommits)
+    
+    // Then process all commits to get total commit counts
     for (const commit of commits.data) {
       let author = commit.commit.author?.name || commit.author?.login || 'Unknown';
       let avatarUrl = commit.author?.avatar_url;
       
-      // Filter out system users and normalize names
+      // Apply same filtering as detailed commits
       if (author === 'root' || author === 'noreply@github.com' || author === 'GitHub' || 
-          author.toLowerCase().includes('bot') || author.toLowerCase().includes('action')) {
+          author.toLowerCase().includes('bot') || author.toLowerCase().includes('action') ||
+          author === 'Unknown' || !author.trim()) {
         author = 'System';
         avatarUrl = undefined;
+      } else {
+        author = author.trim();
+        if (commit.commit.author?.name && commit.author?.login) {
+          author = commit.commit.author.name.trim();
+        }
       }
+      
+      if (author === 'System') continue; // Skip system commits
       
       const existing = contributorMap.get(author) || {
         name: author,
@@ -290,7 +309,8 @@ export async function GET(request: NextRequest) {
         
         // Filter out system users and normalize names
         if (author === 'root' || author === 'noreply@github.com' || author === 'GitHub' || 
-            author.toLowerCase().includes('bot') || author.toLowerCase().includes('action')) {
+            author.toLowerCase().includes('bot') || author.toLowerCase().includes('action') ||
+            author === 'Unknown' || !author.trim()) {
           author = 'System';
         }
         
@@ -308,7 +328,7 @@ export async function GET(request: NextRequest) {
     }
 
     const contributorStats = Array.from(contributorMap.values())
-      .filter(contributor => contributor.name !== 'System');
+      .filter(contributor => contributor.name !== 'System' && contributor.commits > 0);
 
     // Calculate awards
     const awards: Awards = {
@@ -345,37 +365,74 @@ export async function GET(request: NextRequest) {
     };
 
     if (historicalData) {
-      const historical = JSON.parse(historicalData);
-      const twelveHoursAgo = new Date();
-      twelveHoursAgo.setHours(twelveHoursAgo.getHours() - 12);
+      try {
+        const historical = JSON.parse(historicalData);
+        const twelveHoursAgo = new Date();
+        twelveHoursAgo.setHours(twelveHoursAgo.getHours() - 12);
       
-      if (new Date(historical.timestamp) >= twelveHoursAgo) {
-        percentChanges = {
-          branches: calculatePercentChange(historical.branches, currentStats.branches),
-          totalCommits: calculatePercentChange(historical.totalCommits, currentStats.totalCommits),
-          totalContributors: calculatePercentChange(historical.totalContributors, currentStats.totalContributors),
-          totalLinesOfCode: calculatePercentChange(historical.totalLinesOfCode, currentStats.totalLinesOfCode)
-        };
+        if (new Date(historical.timestamp) >= twelveHoursAgo) {
+          percentChanges = {
+            branches: calculatePercentChange(historical.branches, currentStats.branches),
+            totalCommits: calculatePercentChange(historical.totalCommits, currentStats.totalCommits),
+            totalContributors: calculatePercentChange(historical.totalContributors, currentStats.totalContributors),
+            totalLinesOfCode: calculatePercentChange(historical.totalLinesOfCode, currentStats.totalLinesOfCode)
+          };
+        }
+      } catch (error) {
+        console.warn('Failed to parse historical data, clearing corrupted cache and using default percent changes:', error);
+        console.warn('Historical data content:', historicalData?.substring(0, 100) + '...');
+        
+        // Clear corrupted historical data
+        try {
+          await redis.del(historicalKey);
+        } catch (delError) {
+          console.warn('Failed to clear corrupted historical cache:', delError);
+        }
       }
     }
 
     // Store current stats for future percent change calculations
-    await redis.set(historicalKey, JSON.stringify({
-      ...currentStats,
-      timestamp: new Date().toISOString()
-    }), { EX: 86400 }); // Expire after 24 hours
+    try {
+      const historicalData = {
+        ...currentStats,
+        timestamp: new Date().toISOString()
+      };
+      const historicalJson = JSON.stringify(historicalData);
+      // Validate that we can parse it back
+      JSON.parse(historicalJson);
+      
+      await redis.set(historicalKey, historicalJson, { EX: 86400 }); // Expire after 24 hours
+    } catch (error) {
+      console.error('Failed to serialize historical data for caching:', error);
+      // Continue without caching if serialization fails
+    }
 
     const stats: StatsData = {
       branches: { current: currentStats.branches, percentChange: percentChanges.branches },
       totalCommits: { current: currentStats.totalCommits, percentChange: percentChanges.totalCommits },
       totalContributors: { current: currentStats.totalContributors, percentChange: percentChanges.totalContributors },
       totalLinesOfCode: { current: currentStats.totalLinesOfCode, percentChange: percentChanges.totalLinesOfCode },
-      commitsAnalyzed: commitsToAnalyze
+      commitsAnalyzed: Math.min(100, commits.data.length)
     };
+
+    // Keep commits in the same order as debug endpoint (GitHub's original order)
+
+    // Debug logging
+    console.log(`Repository: ${owner}/${repo}`);
+    console.log(`Total commits from GitHub: ${commits.data.length}`);
+    console.log(`Detailed commits analyzed: ${detailedCommits.length}`);
+    console.log(`Contributors found: ${contributorStats.length}`);
+    console.log(`Recent commits (first 3):`, detailedCommits.slice(0, 3).map(c => ({
+      author: c.author,
+      message: c.message.substring(0, 50),
+      date: c.date,
+      additions: c.additions,
+      deletions: c.deletions
+    })));
 
     const response = {
       repository: `${owner}/${repo}`,
-      recentCommitHistory: detailedCommits,
+      recentCommitHistory: detailedCommits, // Show all detailed commits
       timeSeriesData,
       awards,
       stats,
@@ -385,8 +442,18 @@ export async function GET(request: NextRequest) {
 
     // Cache the response and generation time
     const currentTime = new Date().toISOString();
-    await redis.set(statsCacheKey, JSON.stringify(response), { EX: 86400 }); // 24 hours
-    await redis.set(statsGeneratedKey, currentTime, { EX: 86400 }); // 24 hours
+    
+    try {
+      const responseJson = JSON.stringify(response);
+      // Validate that we can parse it back
+      JSON.parse(responseJson);
+      
+      await redis.set(statsCacheKey, responseJson, { EX: 86400 }); // 24 hours
+      await redis.set(statsGeneratedKey, currentTime, { EX: 86400 }); // 24 hours
+    } catch (error) {
+      console.error('Failed to serialize response for caching:', error);
+      // Continue without caching if serialization fails
+    }
 
     return NextResponse.json(response);
 
